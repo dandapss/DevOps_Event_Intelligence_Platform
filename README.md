@@ -14,26 +14,46 @@ Track a small watchlist without repeatedly checking provider sites. See the late
 
 ~~~mermaid
 flowchart TB
-  Dev[WSL development] --> Git[GitHub repository]
+  Dev[Developer in WSL2] --> Git[GitHub repository]
   Git --> Runner[GitHub-hosted Actions]
-  Runner -->|checks and image scan| GHCR[GHCR]
-  Runner -->|Terraform plan, gated apply via OIDC| TF[Terraform]
-  TF -->|VPC, network rules, IAM, EC2, data volume| AWS[AWS]
-  TF --> State[(S3 Terraform state)]
-  AWS --> Host[EC2 Linux host]
-  Host --> K3s[k3s]
-  Git -->|Argo CD pulls desired state| Argo[Argo CD]
-  Argo --> K3s
-  GHCR --> K3s
-  API[Stock data provider] --> Job[Stock collector CronJob]
-  K3s --> Job
-  Job --> DB[(PostgreSQL)]
-  KSM[kube-state-metrics] --> Prom[Prometheus]
-  K3s --> Prom
-  DB --> Grafana[Grafana]
-  Prom --> Grafana
-  Grafana --> Discord[Discord]
+  Runner -->|validate, scan, build| GHCR[GHCR images]
+  Runner -->|Terraform plan and approved apply via OIDC| TF[Terraform]
+  TF -->|provisions production network, EC2, and storage| AWS[AWS production]
+
+  subgraph LOCAL["Development environment - local WSL2"]
+    Kind[kind cluster]
+    DArgo[Argo CD]
+    DApps[Stock collector, PostgreSQL]
+    DObs[Prometheus, Grafana]
+    Kind --> DArgo
+    DArgo --> DApps
+    DApps --> DObs
+  end
+
+  subgraph PROD["Production environment - AWS"]
+    subgraph EC2K3S["VPC - EC2 Linux host - k3s"]
+      PArgo[Argo CD]
+      PApps[Stock collector, PostgreSQL]
+      PObs[Prometheus, Grafana]
+      PArgo --> PApps
+      PApps --> PObs
+    end
+    State[(S3 Terraform state)]
+  end
+
+  TF --> AWS
+  TF --> State
+  Git -->|GitOps desired state| DArgo
+  Git -->|GitOps desired state| PArgo
+  GHCR -->|pull image| DApps
+  GHCR -->|pull image| PApps
+
+  StockAPI[External stock data provider] --> DApps
+  StockAPI --> PApps
+  DObs -->|alert notification| Discord[Discord - external service]
+  PObs -->|alert notification| Discord
 ~~~
+
 
 Terraform manages AWS infrastructure. Argo CD manages Kubernetes workloads. GitHub Actions validates and builds; Terraform apply is gated. AWS values remain placeholders in [AWS_CONNECTIONS.md](docs/AWS_CONNECTIONS.md).
 
@@ -73,4 +93,5 @@ No AWS resources have been created. EC2, storage, network egress, and other AWS 
 7. Verify the full path from PR to AWS, GitOps deployment, collection, dashboard, and alert.
 
 See [project blueprint](docs/PROJECT_BLUEPRINT.md), [MVP specification](docs/MVP_SPEC.md), [implementation plan](docs/IMPLEMENTATION_PLAN.md), [CronJob metrics explanation](docs/CRONJOB_METRICS.md), and [AWS connection checklist](docs/AWS_CONNECTIONS.md), plus the [Kubernetes layout](kubernetes/README.md).
+
 
