@@ -1,48 +1,37 @@
-# 구현 순서
+# Implementation plan
 
-## 0. 범위 결정
-- 한 문장 사용자 목적과 가격/뉴스 규칙을 확정한다.
-- API 후보의 공식 이용 조건, 요청 제한, 비용을 비교한다.
-- 수집 주기, 데이터 보존 기간, 필요한 필드를 정한다.
-- AWS 월 비용 한도와 경고 기준을 정한다.
-- 이 단계에서는 AWS 리소스를 만들지 않는다.
+## Stage 1 — Stock behavior, locally
+- Select the provider only after checking official free-plan terms and request limits.
+- Define the watchlist, quote timestamp semantics, schedule, retention, and threshold.
+- Use fixtures first; implement validation, PostgreSQL upsert, run outcome, and duplicate counting.
+- Demonstrate duplicate replay and provider-error cases without depending on live API availability.
 
-## 1. 로컬 데이터 흐름
-- kind에서 PostgreSQL을 실행한다.
-- fixture를 이용해 collector 정규화와 DB 저장을 구현한다.
-- 중복 저장, 잘못된 입력, API 실패 동작을 검증한다.
-- 실제 API는 선정과 이용 조건 확인 후 연결한다.
+## Stage 2 — Application operations in kind
+- Package the small collector in Docker and run it as a CronJob.
+- Use Helm values for schedule, timeout, resources, image tag, and retention settings.
+- Use kube-state-metrics for Job state; query stored run/freshness data from PostgreSQL in Grafana.
+- Add one threshold notification and one stale-data notification.
+- Keep Prometheus for cluster/node/Pod/Job health; do not add Pushgateway initially.
 
-## 2. 규칙, Grafana, 알림
-- 단순 가격 또는 키워드 조건 하나를 먼저 end-to-end로 구현한다.
-- Discord 알림을 확인한다.
-- PostgreSQL 업무 데이터와 Prometheus 운영 데이터를 Grafana에서 구분한다.
-- stale data와 collector 실패 알림 및 runbook을 작성한다.
-- CronJob이면 kube-state-metrics와 Pushgateway 적용 범위를 결정한다.
+## Stage 3 — Deepen existing tools
+- Argo CD owns Kubernetes desired state and sync behavior; test drift, failed sync, rollback of Git configuration, and pruning boundaries.
+- Prometheus/Grafana: define useful signals, alert conditions, no-data behavior, dashboard variables, annotations, and runbooks.
+- Kubernetes: resource requests/limits, probes for always-on components, Job history/TTL, RBAC, secret references, storage behavior.
+- Docker: small image, non-root runtime, pinned base image, reproducible build, image scan, immutable SHA tag.
 
-## 3. 패키징과 GitOps
-- Docker image와 Helm chart를 만든다.
-- kind에서 Argo CD가 Git 설정을 sync하는지 확인한다.
-- runtime secret을 Git 평문으로 저장하지 않는다.
+## Stage 4 — AWS and Terraform
+- Design a small custom VPC without a NAT Gateway in the first cost-conscious iteration; verify internet egress and access requirements before deployment.
+- Terraform manages VPC, subnet/route, security group, IAM instance profile, EC2, and dedicated PostgreSQL data storage.
+- Keep the k3s API private; restrict admin access to the chosen method.
+- Store Terraform state remotely; bootstrap the backend and GitHub OIDC role deliberately.
+- GitHub-hosted Actions runs fmt/validate/security checks and PR plan; protected approval gates apply.
+- EC2 cloud-init installs the minimal k3s/Argo CD bootstrap; Argo CD then owns workload manifests.
+- Configure 2Gi physical PostgreSQL backing capacity and alerts before it fills. The PVC request alone is not accepted as proof of a hard cap.
 
-## 4. CI / DevSecOps
-- PR에서 Python checks, tests, secret scan, dependency scan을 실행한다.
-- YAML/Helm/Terraform 검증과 IaC scan을 실행한다.
-- 앱 코드 변경에만 image build/scan을 수행하고 SHA tag를 사용한다.
-- main apply는 protected GitHub Environment 승인 뒤 수행한다.
-- Actions 권한을 최소화하고 가능한 경우 action을 immutable SHA로 pin한다.
+## Stage 5 — End-to-end evidence
+- Trace PR → checks → image → GHCR → Argo CD → CronJob → PostgreSQL → Grafana → Discord.
+- Capture successful and controlled failure runs.
+- Record what AWS resources were actually created, their cost boundary, and teardown procedure before any eventual cleanup.
+- Update README with only verified results.
 
-## 5. AWS / Terraform
-- AWS 계정, 리전, 접근 방식, 비용 한도를 확인한 뒤 계획한다.
-- Terraform S3 backend와 OIDC/IAM role bootstrap 순서를 정한다.
-- GitHub-hosted runner에서 OIDC 기반 plan을 수행한다.
-- 승인 후에만 apply한다.
-- Terraform은 AWS, Argo CD는 Kubernetes 앱 리소스를 관리한다.
-- cloud-init은 k3s/Argo CD의 최초 설치에 한정한다.
-
-## 6. 종단 간 검증
-- PR → image → GHCR → Argo sync → collector → PostgreSQL → Grafana → Discord를 시연한다.
-- API 오류, stale data, 잘못된 설정을 넣어 CI/alert를 확인한다.
-- 실제 비용, single-node 한계, 복구 runbook을 문서화한다.
-
-완료라고 쓰기 전 모든 흐름을 실제로 실행해 증거를 남긴다.
+AWS deployment remains gated on [AWS connection details](AWS_CONNECTIONS.md) and cost review.

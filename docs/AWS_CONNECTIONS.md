@@ -1,43 +1,47 @@
 # AWS 연결 전 체크리스트
 
-현재 AWS 계정에 연결하지 않았고, 리소스를 생성·변경·삭제하지 않았다. 아래 표식은 연결 전 채울 자리다.
+현재 AWS 계정에 연결하지 않았고, 리소스를 생성·변경·삭제하지 않았다. 아래 값은 실제 연결 전에 채울 placeholder다.
 
 ## 계정과 비용
-- 계정 ID: [AWS 연결 - 'AWS Account ID']
-- 리전: [AWS 연결 - 'AWS Region']
-- 월 비용 한도와 경고 기준: [AWS 연결 - 'Monthly budget and alert threshold']
-- 계정 접근 주체/MFA: [AWS 연결 - 'AWS identity and MFA method']
+- AWS 계정 ID: [AWS 연결 - 'AWS Account ID']
+- 리전과 가용 영역: [AWS 연결 - 'AWS Region and Availability Zone']
+- 월 비용 상한/경고 기준: [AWS 연결 - 'Monthly budget and alert threshold']
+- 접근 계정, MFA, 사용 가능한 role: [AWS 연결 - 'AWS identity, MFA, and permitted role']
 
-## GitHub Actions → AWS
-- GitHub owner/repository: [AWS 연결 - 'GitHub owner and repository']
+## Terraform state 및 GitHub OIDC
+- Terraform state S3 bucket/key: [AWS 연결 - 'S3 state bucket and key']
+- versioning/encryption/lockfile: [AWS 연결 - 'State bucket protection settings']
+- GitHub owner/repository와 허용 branch/environment: [AWS 연결 - 'GitHub repository trust conditions']
 - IAM OIDC provider ARN: [AWS 연결 - 'GitHub OIDC provider ARN']
-- Terraform plan/apply role ARN: [AWS 연결 - 'Terraform IAM role ARN']
-- 허용할 repository, branch, environment: [AWS 연결 - 'OIDC trust conditions']
-- 보호된 GitHub Environment 승인 규칙: [AWS 연결 - 'Environment approval policy']
+- Terraform plan/apply role ARN 및 정책: [AWS 연결 - 'Terraform IAM role ARN and least-privilege policy']
+- OIDC/backend bootstrap 방법: [AWS 연결 - 'Initial bootstrap procedure']
+- GitHub protected Environment 승인 규칙: [AWS 연결 - 'Apply approval policy']
 
-기본 방향은 장기 AWS access key 대신 OIDC 임시 자격 증명을 사용하고, role 권한과 trust 조건을 최소 범위로 제한하는 것이다.
+장기 AWS key를 GitHub secrets에 저장하지 않고 OIDC 임시 자격 증명을 쓰는 방향이다. Role trust와 permission은 저장소, branch/environment, 실제 관리 리소스에 한정한다.
 
-## Terraform state
-- S3 bucket 이름: [AWS 연결 - 'Terraform state bucket name']
-- state key: [AWS 연결 - 'Terraform state key']
-- backend 리전/encryption/versioning: [AWS 연결 - 'State backend settings']
-- state lockfile 설정: [AWS 연결 - 'S3 lockfile setting']
-- backend/OIDC 초기 bootstrap 방법: [AWS 연결 - 'Bootstrap procedure']
+## AWS network와 EC2
+- Custom VPC CIDR: [AWS 연결 - 'VPC CIDR']
+- Public subnet CIDR 및 route/Internet Gateway: [AWS 연결 - 'Subnet and internet route']
+- EC2 AMI/instance type/public IP 선택: [AWS 연결 - 'EC2 image, size, and public address']
+- Security Group inbound/outbound: [AWS 연결 - 'Allowed ingress and egress']
+- host 접근 방식(SSM 또는 제한 SSH): [AWS 연결 - 'Host access method']
+- EC2 instance profile: [AWS 연결 - 'EC2 role and required permissions']
+- DNS/TLS 종료 지점: [AWS 연결 - 'Domain and TLS termination']
+- K3s API를 외부에 공개하지 않는 접근 방식: [AWS 연결 - 'Private k3s API access']
 
-S3 backend bucket은 아직 생성하지 않았다. Terraform이 backend를 사용하기 전에 bootstrap 순서를 정해야 한다.
+MVP 계획은 NAT Gateway를 두지 않는 저비용 단일 EC2 구성이다. 외부 API 접근, 이미지 pull, 관리 접근에 필요한 egress가 가능한지 확인해야 한다. 실제 적용 전에 네트워크 노출과 예상 요금을 검토한다.
 
-## EC2 / k3s
-- EC2 AMI, 크기, subnet: [AWS 연결 - 'EC2 AMI, instance type, and subnet']
-- EC2 instance profile: [AWS 연결 - 'EC2 instance profile and scoped permissions']
-- host 접근(SSM 또는 제한 SSH): [AWS 연결 - 'Host access method']
-- DNS/TLS: [AWS 연결 - 'Domain and TLS termination']
-- k3s API 접근 제한: [AWS 연결 - 'K3s API access restriction']
+## PostgreSQL storage
+- 전용 EBS volume 크기 목표: [AWS 연결 - 'PostgreSQL data volume: 2 GiB']
+- EBS volume type/AZ/attachment: [AWS 연결 - 'EBS type, AZ, and attachment']
+- k3s StorageClass 또는 host mount 설계: [AWS 연결 - 'Storage provisioner and mount path']
+- 70/85% 사용량 알림 기준 확인: [AWS 연결 - 'Disk usage warning and critical thresholds']
 
-K3s API를 인터넷 전체에 공개하지 않는다. SSH/SSM 선택 시 필요한 네트워크와 비용을 먼저 확인한다.
+2GiB는 PostgreSQL data directory의 물리 backing volume 한도다. WAL, index, temporary files도 이 공간을 사용하므로 실제 quote 데이터는 더 적게 저장할 수 있다. Kubernetes PVC request만으로 물리 사용량이 제한된다고 가정하지 않는다.
 
-## 외부 API와 runtime secret
-- Stock API와 credential 저장 방식: [AWS 연결 - 'Stock API and secret storage']
-- News source와 credential 저장 방식: [AWS 연결 - 'News source and secret storage']
-- Discord webhook 저장 방식: [AWS 연결 - 'Discord webhook secret storage']
+## Stock provider / Discord secret
+- Stock provider, free quota, data delay and terms: [AWS 연결 - 'Selected stock provider and verified free-plan terms']
+- API key 보관 방식: [AWS 연결 - 'Stock API secret storage']
+- Discord webhook 보관 방식: [AWS 연결 - 'Discord webhook secret storage']
 
-API key와 webhook을 Git, image layer, Terraform 변수 파일, 로그에 넣지 않는다. 유료 secret 서비스는 요금을 확인하기 전 사용하지 않는다.
+외부 API key와 webhook은 Git, Terraform state/plan, container image, 로그에 넣지 않는다. 유료 secret 관리 서비스를 선택하기 전에는 요금을 확인한다.

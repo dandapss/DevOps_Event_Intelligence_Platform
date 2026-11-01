@@ -1,0 +1,18 @@
+# Example only; not applied by Argo CD.
+# Confirm that the chosen StorageClass enforces capacity before relying on this as a hard cap.
+# For EC2 k3s, the physical 2Gi limit must come from a dedicated EBS-backed volume.
+# [AWS 연결 - 'EBS volume, k3s StorageClass/driver, and scoped IAM permissions']
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: event-intelligence
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Replace after choosing and verifying the kind and AWS storage provisioners.
+  storageClassName: REPLACE_WITH_CONFIRMED_STORAGE_CLASS
+  resources:
+    requests:
+      # The Namespace quota also rejects requests above 2Gi.
+      storage: 2Gi

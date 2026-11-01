@@ -1,61 +1,76 @@
-# 프로젝트 분석과 설계 기준
+# Project blueprint
 
-## 메인 목적
+## Project purpose
 
-관심 종목의 가격과 관련 뉴스를 수집해 저장하고, 사용자가 정한 단순한 조건에 맞으면 Discord로 알리는 개인 모니터링 서비스를 만든다. Grafana에서 업무 데이터와 운영 상태를 함께 확인한다.
+The MVP answers one question: “Did a watched stock cross my configured threshold, and is the quote data current enough to trust?” It collects stock observations, stores history, visualizes freshness, and sends Discord alerts.
 
-사용자 문제는 관심 정보가 여러 사이트에 흩어져 있어 반복해서 확인해야 한다는 점이다. Watchlist와 규칙에 따라 필요한 정보를 모아 보여주고 확인이 필요한 조건을 알린다. 금융 투자 권유나 자동 매매는 범위 밖이다.
+Stock prices are the primary scope. News is phase two to provide context after the stock pipeline is reliable. K-pop events, automated trading, AI sentiment, and a custom rule engine are out of scope for the MVP.
 
-## 이전 프로젝트에서 이번 프로젝트로 확장되는 점
+## How this advances the previous project
 
-| 영역 | 기존 Kubernetes Monitoring에서 확인한 구현 | 새로 확장할 역량 |
-|---|---|---|
-| Kubernetes | Kubernetes API에서 Pod, Deployment, Namespace, Warning Event 조회 | 외부 업무 데이터를 처리하는 서비스와 스케줄 작업 운영 |
-| Python | Kubernetes 데이터를 Prometheus 형식으로 노출하는 exporter | 외부 소스 수집, 정규화, 재시도와 중복 방지 |
-| Prometheus / Grafana | exporter scrape, PromQL 대시보드 | 운영 지표와 PostgreSQL 업무 데이터를 함께 조회하고 알림 |
-| Helm / Argo CD | Helm chart를 GitOps로 배포 | 앱, DB, 수집 작업과 모니터링 구성 배포 |
-| GitHub Actions / GHCR | ubuntu-latest hosted runner, manifest 검사, 조건부 이미지 빌드, Trivy, GHCR, image tag 갱신 | Terraform 검사·plan·승인 apply, OIDC 기반 AWS 접근 |
-| 테스트 | exporter pytest | 수집 결과, 재실행, API 오류, 규칙 평가 검증 |
-| 인프라 | Docker Desktop Kubernetes와 kind 실습 | Terraform으로 AWS EC2 기반 k3s 구성 |
+The previous Kubernetes Monitoring repository reads Kubernetes API objects and exports cluster state to Prometheus/Grafana. It already demonstrates Docker, Kubernetes, Helm, GitHub Actions hosted runners, GHCR, Argo CD, Prometheus, Grafana, basic tests, and Trivy.
 
-새 프로젝트는 Kubernetes 모니터링 exporter에서 데이터 처리 서비스를 운영하는 쪽으로 확장한다. GitHub Actions와 GitOps 경험은 재사용하고, AWS IaC, PostgreSQL, 데이터 수집, DevSecOps를 추가한다.
+This project reuses those foundations but changes the workload and increases depth:
 
-파일이 존재하는 것과 실제로 실행·검증한 경험은 구분해야 한다. 새 프로젝트가 아직 계획 단계이므로 AWS/Terraform/DevSecOps를 완료된 기술로 소개하지 않는다.
+- From observing Kubernetes objects to operating a scheduled, stateful data workload.
+- From a local cluster only to Terraform-managed AWS networking, IAM, EC2, k3s, and persistent storage.
+- From image build and GitOps sync to a reviewed Terraform plan/apply path and explicit state ownership.
+- From a cluster dashboard to operational SLI signals: latest successful collection, data age, accepted/duplicate/rejected records, Job outcome, and alert delivery.
+- From merely adding scans to defining what each gate blocks and proving it with controlled failure cases.
 
-## 채용 담당자 관점
+The new AWS and Terraform parts count as experience only after they are run and verified. The repository currently contains planning/starter material, not proof of a completed cloud deployment.
 
-주니어/전환 DevOps 포지션에 기존 프로젝트와 구별되는 근거를 제공할 수 있다. 가치는 도구 개수가 아니라 다음 흐름을 실제로 시연하고 설명할 수 있는지에 달려 있다.
+## Is the Python collector DevOps work?
 
-- 외부 소스 → collector → PostgreSQL → Grafana/Discord
-- 잘못된 입력, API 오류, 중복 실행, 데이터 지연의 처리
-- PR 검사가 위험한 변경을 막고 이미지와 commit을 추적
-- AWS 변경은 plan과 승인 절차를 거치고 IAM 권한은 제한
-- 알림이 실제 조건에서 발생하고 대응 절차를 제공
+The code that calls a market API, parses quote responses, normalizes stock fields, and evaluates stock-specific rules is application/data-engineering work. In a company, that logic would normally belong to a backend or data engineer.
 
-이 프로젝트가 실무 AWS 경력을 대신하지는 않는다. 다만 end-to-end로 실행하고 검증하면 전환 포트폴리오를 강화한다.
+A DevOps engineer may write a small collector or automation script when needed to create and operate a workload. The DevOps evidence is how it is packaged, configured, scheduled, secured, observed, recovered, and delivered—not the amount of finance logic in Python.
 
-## 시니어 엔지니어 관점에서 설계에 넣을 것
+For this portfolio, keep the collector intentionally small. Spend most effort on AWS/Terraform, CI/CD controls, Kubernetes/Argo CD operations, and monitoring. A planning allocation is: AWS/Terraform 35%, CI/CD and delivery controls 20%, Kubernetes/Helm/Argo CD 20%, observability and reliability 20%, collector business logic 5%. This is a prioritization guide, not a claim about completed work.
 
-1. **한 가지 사용 목적**: MVP는 주식 + 관련 뉴스. K-pop은 후속 데이터 소스로 분리한다.
-2. **데이터 신뢰성**: API 이용 조건, 호출 한도, timeout, retry/backoff, deduplication, 마지막 수집 시각과 stale 상태를 다룬다.
-3. **재실행 안전성**: 같은 데이터 재수집이 중복 행·중복 알림을 만들지 않게 한다.
-4. **업무 데이터/운영 지표 분리**: 가격·뉴스는 PostgreSQL, 실행 성공/실패·지속시간·마지막 성공은 Prometheus 계열 지표.
-5. **CronJob 메트릭**: 짧은 Job은 scrape 전에 끝날 수 있다. Job 상태는 kube-state-metrics로, 배치 custom metrics는 Pushgateway를 검토한다. Pushgateway의 stale series와 grouping label을 관리해야 한다.
-6. **알림 품질**: data freshness, no-data/error, repeat interval, grouping, runbook을 정의한다.
-7. **DevSecOps**: PR secret/dependency/code/IaC/image 검사, severity 기준과 예외 절차를 둔다.
-8. **AWS 권한**: GitHub OIDC, 제한된 role, PR plan, 보호된 승인 후 apply.
-9. **런타임 보안**: k3s API 비공개, 최소 RBAC, non-root, 불필요 capability 제거, resource limits, 제한된 네트워크 노출.
-10. **한계·비용 투명성**: 단일 EC2는 단일 장애 지점이며 HA라고 부르지 않는다. 예상 사용비와 정지/정리 절차를 기록한다.
+## Data reliability: what can be controlled and shown
 
-## 현재 결정과 미정 사항
+The free provider's quota, delays, and outages are external constraints. Do not claim to guarantee the provider. Show that the client respects documented limits and handles failures predictably:
 
-- 결정: Stock + News 우선, K-pop 후순위.
-- 결정: Grafana를 MVP 운영 화면으로 사용, 별도 Web UI 없음.
-- 결정: PostgreSQL은 업무 데이터, Prometheus는 운영 데이터.
-- 결정: MVP 알림은 Discord 하나.
-- 미정: API 제공자/이용 조건/무료 한도/호출 간격.
-- 미정: CronJob 주기와 custom metric 전달 방식.
-- 미정: AWS 리전, EC2 크기, host 접근, 비용 상한.
-- 제외: 초기 Rule Engine, AI sentiment, 자동 매매, EKS, 다중 노드 HA.
+- Schedule requests within the published quota with a safety margin.
+- Set connect/read timeouts; retry only transient failures with bounded exponential backoff and jitter.
+- On HTTP 429, honor Retry-After when supplied; do not retry permanent client errors indefinitely.
+- Validate symbol, numeric price, currency, and provider timestamp before storage.
+- Store provider observation time separately from collection time.
+- Update last-success only after validation and database commit complete.
+- Record run status and counts: received, inserted, duplicate, rejected.
+- Test with fixtures for duplicate data, timeout, 429, 5xx, malformed payload, and empty response.
+- Grafana shows last success, data age, counts, and errors; alerts when data is stale.
 
-보안과 아키텍처 가이드는 계획 상태다. 구현과 검증이 끝난 후에만 완료 표현을 쓴다.
+These signals demonstrate controlled behavior. They do not prove the external provider's market data is absolutely correct; that requires source comparison or provider guarantees and is outside this low-cost MVP.
+
+## Deduplication / idempotency
+
+For market snapshots, use a unique key based on the provider's stable observation identity—normally symbol, source, and provider observation timestamp. Store with an upsert/ON CONFLICT policy. Replaying the same fixture should leave the row count unchanged and increase a duplicate counter.
+
+Do not use collection time as the only deduplication key: fetching the same provider snapshot twice would then create two records. Alert deduplication is separate from data deduplication.
+
+## CronJob metrics in this design
+
+Prometheus normally pulls metrics from an endpoint at intervals. A short-lived CronJob may start and exit between scrapes, so a metrics endpoint inside that process is not reliably scrapeable.
+
+MVP choice:
+- Use kube-state-metrics to observe whether the Kubernetes Job succeeded, failed, or is overdue.
+- Record application-specific collection outcomes in PostgreSQL.
+- Let Grafana query PostgreSQL for data freshness and received/inserted/duplicate/rejected counts; use Prometheus for Kubernetes, node, and Pod health.
+- Do not add Pushgateway in the first version.
+
+If custom collector metrics must appear in Prometheus later, add a small long-running exporter that reads the latest run summary from PostgreSQL. Pushgateway is another option for batch-job metrics, but it adds stale-series lifecycle management.
+
+## Recruiter-facing proof
+
+Do not present this as production AWS experience before it exists. A convincing portfolio should include a reproducible demo and evidence:
+
+- Terraform plan and approved apply workflow with AWS identity scope explained.
+- AWS network diagram, security group rules, IAM role permissions, and state backend ownership.
+- Successful GitHub Actions run, scanned immutable image, and Argo CD sync.
+- Grafana screenshots with useful values and a demonstrated stale-data alert.
+- Failure table showing input condition, expected handling, observed result, and recovery.
+- Cost boundary and single-EC2/k3s limitations.
+
+This supports junior/transition DevOps applications by showing work beyond the previous local monitoring project. It does not by itself establish senior-level professional experience.
