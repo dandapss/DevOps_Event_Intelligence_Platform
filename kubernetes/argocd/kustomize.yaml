@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.l8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../prometheus/application.yaml
+  - ../grafana/application.yaml
+  - ../app/stock-collector/application.yaml
+  - ../app/news-collector/application.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: argocd
+  app.kubernetes.io/part-of: event-intelligence-platform

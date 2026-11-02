@@ -1,0 +1,12 @@
+adminUser: admin
+
+persistence:
+  enabled: true
+
+  size: 2Gi
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false

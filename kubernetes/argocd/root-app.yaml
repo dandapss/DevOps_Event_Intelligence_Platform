@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: event-intelligence-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dandapss/DevOps_Event_Intelligence_Platform.git
+    targetRevision: main
+    path: kubernetes/argocd
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,22 +1,25 @@
-# Example only; do not apply until the application charts exist under kubernetes/apps.
-# Argo CD will pull this repository; it does not run Terraform.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: event-intelligence-root
+  name: grafana
   namespace: argocd
+
 spec:
   project: default
+
   source:
     repoURL: https://github.com/dandapss/DevOps_Event_Intelligence_Platform.git
     targetRevision: main
-    path: kubernetes/apps
-    directory:
-      recurse: true
+    path: kubernetes/grafana
+
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: monitoring
+
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
