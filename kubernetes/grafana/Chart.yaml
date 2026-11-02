@@ -4,6 +4,8 @@ name: grafana
 
 type: application
 
+version: 0.1.0
+
 dependencies:
   - name: grafana
     version: 9.2.10

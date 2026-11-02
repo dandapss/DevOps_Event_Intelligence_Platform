@@ -1,9 +1,0 @@
-# Project namespace for the stock-monitoring workload.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: event-intelligence
-  labels:
-    app.kubernetes.io/part-of: event-intelligence-platform
-    # Change this label through the environment overlay when staging/prod is added.
-    environment: development
