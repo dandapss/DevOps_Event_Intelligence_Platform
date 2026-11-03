@@ -61,7 +61,7 @@ def save_stock(data: dict):
         INSERT INTO stock_prices
         (symbol,current_price,previous_close,change_percent,currency,market_status,collected_at)
         VALUES
-        (%S,%s,%s,%s,%s,%s,%s)
+        (%s,%s,%s,%s,%s,%s,%s)
         """,
         (
           data["symbol"],
