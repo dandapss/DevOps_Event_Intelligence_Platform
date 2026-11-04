@@ -19,3 +19,26 @@ CREATE TABLE IF NOT EXISTS stock_prices (
 CREATE INDEX IF NOT EXISTS idx_stock_prices_symbol ON stock_prices(symbol);
 
 CREATE INDEX IF NOT EXISTS idx_stock_prices_collected_at ON stock_prices(collected_at);
+
+
+---
+
+CREATE TABLE IF NOT EXISTS stock_news (
+  id BIGSERIAL PRIMARY KEY,
+
+  symbol VARCHAR(20) NOT NULL,
+
+  title TEXT NOT NULL,
+
+  summary TEXT NOT NULL,
+
+  published_at TIMESTAMP,
+
+  url TEXT NOT NULL UNIQUE,
+
+  collected_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_news_symbol ON stock_news(symbol);
+
+CREATE INDEX IF NOT EXISTS idx_stock_news_collected_at ON stock_news(collected_at);

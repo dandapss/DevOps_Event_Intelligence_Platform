@@ -90,8 +90,8 @@ def main():
         f"{data['current_price']}"
       )
 
-    except Exception as ex:
-      print(f"[FAILED] {symbol}: {ex}")
+    except Exception as e:
+      print(f"[FAILED] {symbol}: {e}")
 
 if __name__ == "__main__":
   main()

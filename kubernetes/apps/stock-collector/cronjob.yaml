@@ -1,0 +1,33 @@
+apiVersion: batch/1
+kind: CronJob
+
+metadata:
+  name: stock-collector
+
+spec:
+  schedule: "*/5 * * * *"
+
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+
+          containers:
+            - name: stock-collector
+              image: stock-collector
+              imagePullPolicy: IfNotPresent
+
+              envFrom:
+                - configMapRef:
+                  name: stock-collector-config
+
+              env:
+                - name: DB_USER
+                  value: stock
+
+                - name: DB_PASSWORD
+                  value: stock
