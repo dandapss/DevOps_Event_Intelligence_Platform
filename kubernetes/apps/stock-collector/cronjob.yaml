@@ -1,4 +1,4 @@
-apiVersion: batch/1
+apiVersion: batch/v1
 kind: CronJob
 
 metadata:
@@ -23,7 +23,7 @@ spec:
 
               envFrom:
                 - configMapRef:
-                  name: stock-collector-config
+                    name: stock-collector-config
 
               env:
                 - name: DB_USER

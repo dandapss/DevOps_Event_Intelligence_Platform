@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-
+import sys
 import psycopg2
 import yfinance as yf
 
@@ -92,6 +92,10 @@ def main():
 
     except Exception as e:
       print(f"[FAILED] {symbol}: {e}")
+      failed = True
+
+  if failed:
+    sys.exit(1)
 
 if __name__ == "__main__":
   main()

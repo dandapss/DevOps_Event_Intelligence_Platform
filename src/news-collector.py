@@ -1,9 +1,6 @@
-#https://feeds.finance.yahoo.com/rss/2.0/headline?s=MSFT&region=US&lang=en-US
-
-
 import os
 from datetime import datetime
-
+from urllib.request import urlopen
 import psycopg2
 import feedparser as fp
 
@@ -18,49 +15,6 @@ SYMBOLS = os.getenv(
   "MSFT,NVDA,TSM"
 ).split(",")
 
-def get_news_data(symbol: str):
-  url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
-  print(url)
-  feed = fp.parse(url)
-  entries = feed.entries
-  
-  titles = entries[0].get("title")
-  url = entries[0].get("link")
-  if titles is None or url is None:
-    raise Exception(
-      f"News not found for {symbol}"
-    )
-  else:
-    print(f"It passed@@@@@@@@@@@@@@@@")
-
-# Need to ask GPT Codex. Way 1
-# Need to use "list" in save_news
-  articles = []
-  for entry in entries:
-    articles.append(
-      {
-        "symbol" : symbol,
-        "title" : entry.get("title"),
-        "summary" : entry.get("summary"),
-        "published" : entry.get("published"),
-        "url" : entry.get("link"),
-        "collected_at" : datetime.utcnow()
-      }
-    )
-  return articles
-
-# Need to ask GPT Codex, Way 2
-# Need to use "dict" in save_news 
-  for entry in entries:
-    new = {
-      "symbol" : symbol,
-      "title" : entry.get("title"),
-      "summary" : entry.get("summary"),
-      "published" : entry.get("published"),
-      "url" : entry.get("link"),
-      "collected_at" : datetime.utcnow()
-    }
-
 def get_connection():
   return psycopg2.connect(
     host=DB_HOST,
@@ -71,10 +25,21 @@ def get_connection():
   ) 
 
 
-def save_news(data: dict):
-  conn = get_connection()
+def get_news_data(symbol: str):
+  url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
+  print(url)
 
-  try:
+  with urlopen(url, timeout=10) as response:
+    feed = fp.parse(response.read())
+
+  if not feed.entries:
+    raise ValueError(f"No news entries found for {symbol}")
+  return feed.entries
+
+def save_news(data: dict, conn):
+  # conn = get_connection()
+
+  # try:
     with conn.cursor() as cur:
       cur.execute(
         """
@@ -82,6 +47,7 @@ def save_news(data: dict):
         (symbol,title,summary,published_at,url,collected_at)
         VALUES
         (%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (url) DO NOTHING
         """,
         (
           data["symbol"],
@@ -92,30 +58,55 @@ def save_news(data: dict):
           data["collected_at"]
         )
       )
-    conn.commit()
+
+def main():
+  try:
+    conn = get_connection()
+  except Exception as e:
+    print(f"[FAILED] Could not connect to PostgresSQL: {e}")
+    return 1
+  failed = False
+
+  try:
+    for symbol in SYMBOLS:
+      try:
+        entries = get_news_data(symbol)
+        symbol_failed = False
+
+        for entry in entries:
+          title = entry.get("title")
+          url = entry.get("link")
+
+          if not title or not url:
+            print(f"[FAILED] {symbol}: article is missing title or URL")
+            failed = True
+            symbol_failed = True
+            continue
+
+          data = {
+            "symbol" : symbol,
+            "title" : title,
+            "summary" : entry.get("summary") or "",
+            "published_at" : entry.get("published"),
+            "url" : url,
+            "collected_at" : datetime.now()
+          }
+
+          save_news(data, conn)
+        conn.commit()
+        if symbol_failed:
+          print(f"[FAILED] {symbol}: one or more articles were skipped")
+        else:
+          print(f"[SUCCESS] {symbol}")
+      except Exception as e:
+        conn.rollback()
+        failed = True
+        print(f"[FAILED] {symbol}: {e}")      
 
   finally:
     conn.close()
 
-
-def main():
-  for symbol in SYMBOLS:
-    try:
-      data = get_news_data(symbol)
-      save_news(data)
-
-      print(f"[SUCCESS] {symbol}")
-
-    except Exception as e:
-      print(f"[FAILED] {symbol} : {e}")
+  return 1 if failed else 0
 
 if __name__ == "__main__":
-  main()
-
-data = get_news_data("MSFT")
-print("==== This is Data ====")
-print(data)
-print("==== This is save_news ====")
-tt = save_news(data)
-print(tt)
-
+  raise SystemExit(main())
