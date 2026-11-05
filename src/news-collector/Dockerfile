@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/news-collector/news-collector.py
+COPY news-collector.py ./
 EXPOSE 8080
 
 USER app

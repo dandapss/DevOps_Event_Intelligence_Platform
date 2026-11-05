@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/stock-collector/stock-collector.py
+COPY stock-collector.py ./
 EXPOSE 9090
 
 USER app

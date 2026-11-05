@@ -79,6 +79,8 @@ def save_stock(data: dict):
     conn.close()
 
 def main():
+  failed = False
+
   for symbol in SYMBOLS:
     try:
       data = get_stock_data(symbol)

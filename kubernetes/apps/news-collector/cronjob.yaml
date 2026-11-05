@@ -27,7 +27,7 @@ spec:
 
               env:
                 - name: DB_USER
-                  value: news
+                  value: db_user
 
                 - name: DB_PASSWORD
-                  value: news
+                  value: db_password

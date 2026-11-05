@@ -1,10 +1,11 @@
-auth:
-  postgresPassword: postgres
-  username: stock
-  password: stock
-  database: event_intelligence
+postgresql:
+  auth:
+    postgresPassword: postgres
+    username: db_user
+    password: db_password
+    database: event_intelligence
 
-primary:
-  persistence:
-    enabled: true
-    size: 2Gi
+  primary:
+    persistence:
+      enabled: true
+      size: 2Gi

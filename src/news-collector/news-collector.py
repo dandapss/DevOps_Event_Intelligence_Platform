@@ -53,7 +53,7 @@ def save_news(data: dict, conn):
           data["symbol"],
           data["title"],
           data["summary"],
-          data["published"],
+          data["published_at"],
           data["url"],
           data["collected_at"]
         )
