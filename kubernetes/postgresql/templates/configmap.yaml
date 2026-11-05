@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-schema
+
+data:
+  schema.sql: {{ .Files.Get "../../../db/schema.sql" | indent 4 }}

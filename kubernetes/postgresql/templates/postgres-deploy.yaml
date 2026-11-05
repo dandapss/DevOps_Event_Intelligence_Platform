@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+
+        volumeMounts:
+        - name: schema
+# I do not know what this means
+          mountPath: /docker-entrypoint-initdb.d
+
+      volumes:
+      - name: schema
+        configMap:
+          name: postgres-schema
