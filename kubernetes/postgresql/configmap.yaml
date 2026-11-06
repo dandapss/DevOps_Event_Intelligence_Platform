@@ -4,4 +4,5 @@ metadata:
   name: postgres-schema
 
 data:
-  schema.sql: {{ .Files.Get "schema.sql" | indent 4 }}
+  schema.sql: |-
+{{ .Files.Get "schema.sql" | indent 4 }}

@@ -9,3 +9,13 @@ postgresql:
     persistence:
       enabled: true
       size: 2Gi
+      storageClass: postgres-storage
+
+    extraVolumes:
+    - name: schema
+      configMap:
+        name: postgres-schema
+
+    extraVolumeMounts:
+    - name: schema
+      mountPath: /docker-entrypoint-initdb.d
