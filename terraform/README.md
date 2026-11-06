@@ -1,12 +1,43 @@
-# Terraform directory
+Terraform manages AWS infrastructure for the production environment.
 
-Terraform manages the AWS foundation: custom VPC, subnet and routing, security groups, IAM instance profile, EC2 host, and dedicated PostgreSQL data storage. Argo CD manages Kubernetes workloads after k3s bootstrap.
+Managed by Terraform:
+- VPC
+- Subnets
+- Internet Gateway
+- Route Tables
+- Security Groups
+- IAM Roles / Instance Profile
+- EC2 (Linux)
+- Cloudflare DNS (planned, if possible)
 
-Planned GitHub-hosted runner workflow:
-1. Pull request: fmt, validate, IaC security checks, and Terraform plan.
-2. Review planned create/update/destroy actions.
-3. A protected GitHub Environment gates apply.
-4. Actions assumes a restricted AWS role through OIDC; no long-lived AWS keys.
-5. Store state remotely in S3 with versioning and locking.
+besides:
+- K3S will be deployed by ansible
+- argocd will be deployed by ansible or terraform (No idea which is better)
 
-Provider constraints are in versions.tf. Commit .terraform.lock.hcl after init. Never commit .terraform/, state files, or real .tfvars. No AWS resources or backend are created yet; check the budget before apply.
+Workflow
+1. "Push" by DevOps Engineer or Developer
+   - Git
+
+2. GitHub Actions
+   - Test the code
+   - Check the security
+   - Build Image
+   - Save in GHCR
+
+3. Terraform 
+   - AWS Infrastructure Provisioning
+
+4. Ansible
+   - k3s Installation
+   - argo cd installation
+
+5. argo cd
+   - postgresql
+   - grafana
+   - stock collector
+   - news collector
+   - prometheus (if necessary)
+
+6. Grafana
+   - Alert which hits the criteria
+   - Show necessary information through dashboard

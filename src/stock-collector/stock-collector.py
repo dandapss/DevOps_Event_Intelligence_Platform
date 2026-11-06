@@ -7,8 +7,8 @@ import yfinance as yf
 DB_HOST = os.getenv("DB_HOST", "postgresql")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "event_intelligence")
-DB_USER = os.getenv("DB_USER", "stock")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "stock")
+DB_USER = os.getenv("DB_USER", "db_user")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "db_password")
 
 SYMBOLS = os.getenv(
   "SYMBOLS",
