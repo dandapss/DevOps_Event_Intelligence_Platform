@@ -1,0 +1,79 @@
+EIP - 작업 및 구성 TODO
+기준일: 2026-11-06
+
+목적
+주식 watchlist를 주기적으로 수집해 PostgreSQL에 저장하고, 데이터 상태를 Grafana로 확인하며 조건 충족 시 Discord 알림을 보내는 서비스를 운영한다. 개발은 로컬 kind, 운영은 AWS EC2의 k3s를 목표로 한다. 현재 AWS 리소스는 만들지 않는다.
+
+현재 확인된 상태
+- stock/news collector 코드, Dockerfile, requirements, CronJob, ConfigMap, Kustomize, Argo CD Application이 있다.
+- 두 collector의 Kubernetes 환경변수와 Python 기본값은 db_user / db_password로 맞춰져 있다.
+- PostgreSQL은 Bitnami Helm dependency를 사용하는 wrapper chart다. values.yaml에서 auth와 primary 설정이 postgresql 아래에 있다.
+- kubernetes/postgresql/schema.sql은 chart 루트에 있다. values.yaml은 postgres-schema ConfigMap을 volume으로 참조하지만, 현재 templates/configmap.yaml이 없어 ConfigMap을 만들지 않는다.
+- values.yaml은 postgres-storage StorageClass를 지정한다. 저장소에는 해당 이름의 StorageClass manifest가 없다. 클러스터에 이미 존재하는지는 배포 전에 확인해야 한다.
+- Terraform은 현재 provider, versions, variables만 있다. AWS 리소스를 정의하는 main.tf와 backend, GitHub Actions workflow, Ansible playbook은 아직 없다.
+- Terraform README는 Cloudflare DNS를 선택사항으로 언급하고, Argo CD를 Ansible 또는 Terraform 중 어디서 설치할지 미결정으로 남긴다.
+- 권장 역할 분리를 확정한 뒤 Terraform README의 미결정 문구를 실제 bootstrap 순서로 갱신한다.
+
+권장 역할 분리
+1. Terraform: AWS 리소스의 생성과 변경을 관리한다. MVP 대상은 VPC, subnet, Internet Gateway, route table, security group, IAM role/instance profile, EC2, PostgreSQL data volume이다. Kubernetes workload는 Terraform으로 관리하지 않는다.
+2. Ansible: EC2 운영체제 설정과 k3s 설치를 담당한다. k3s가 준비된 뒤 Argo CD를 1회 설치하고 root-app.yaml을 적용해 GitOps를 시작한다. 이후 애플리케이션 리소스는 Argo CD가 관리한다.
+3. Argo CD: root Application이 하위 Application을 등록하고 PostgreSQL, collector 및 나중의 Grafana/Prometheus 구성을 Git 기준으로 동기화한다.
+4. GitHub Actions: PR에서 검증과 Terraform plan을 실행하고 collector 이미지를 빌드·스캔해 GHCR에 게시한다. AWS apply는 OIDC 임시 권한과 보호된 Environment 승인 뒤에만 실행한다.
+
+1단계 - PostgreSQL을 kind에서 동작시키기
+[현재 우선순위]
+- templates/configmap.yaml을 추가해 차트 루트의 schema.sql을 postgres-schema ConfigMap으로 만든다. SQL은 YAML block scalar로 넣는다: schema.sql: |- 다음 줄에서 .Files.Get "schema.sql" | nindent 4를 사용한다.
+- values.yaml의 수동 extraVolumes / extraVolumeMounts 대신 Bitnami 차트의 primary.initdb.scriptsConfigMap: postgres-schema 설정을 사용한다. 이 설정은 ConfigMap을 PostgreSQL 초기화 스크립트로 연결한다.
+- chart dependency에 설정한 이름과 ConfigMap 이름을 postgres-schema로 일치시킨다.
+- kind에 postgres-storage StorageClass가 있는지 확인한다. 없으면 로컬 kind에서 사용할 StorageClass를 정하고 values.yaml과 맞춘다. StorageClass 이름이 존재하지 않으면 PVC가 Pending 상태가 될 수 있다.
+- Helm dependency와 manifest를 로컬에서 렌더링해 ConfigMap, PostgreSQL StatefulSet/Service, PVC가 한 PostgreSQL 인스턴스를 가리키는지 확인한다.
+- kind에 배포한 뒤 PVC가 Bound인지, PostgreSQL이 Ready인지, service 이름과 namespace가 collector 설정과 맞는지 확인한다.
+- 새 DB 초기화 시 schema.sql이 실행되어 stock_prices와 stock_news가 생성되는지 확인한다. initdb 스크립트는 새 데이터 디렉터리의 첫 초기화 용도다. 이미 초기화된 DB에서 SQL 파일 변경만으로 다시 실행되지 않으므로 기존 PVC를 지우지 말고 필요하면 psql로 적용한다.
+- db_user가 두 테이블에 필요한 쓰기 권한을 갖는지 확인하고 두 collector가 같은 계정으로 각각 insert할 수 있는지 확인한다.
+- storage request 2Gi와 물리 디스크의 실제 상한은 같은 의미가 아니다. 로컬 검증에서는 PVC 크기를 확인하고, 운영에서 물리 2Gi 한도를 보장할 방법은 AWS storage 설계 단계에서 정한다.
+
+2단계 - Collector end-to-end 검증
+- 현재 구현은 yfinance/RSS 응답을 수집해 DB에 저장하는 기초 흐름이다. API의 이용조건, 데이터 지연, quota와 timestamp 의미를 확인하고 문서화한다.
+- stock_prices에는 collected_at만 있다. 제공처 관측 시각을 저장할지 정하고, MVP 요구사항에 맞춰 출처 시각과 수집 시각을 구분한다.
+- stock 수집의 재실행/idempotency 정책을 정한다. 현재 stock_prices에는 중복 방지 unique key가 없다. news URL은 unique이고 news insert는 ON CONFLICT DO NOTHING을 사용한다.
+- 외부 요청 실패, 빈 응답, DB 연결 실패가 CronJob의 exit code와 Job 상태에 올바르게 반영되는지 확인한다.
+- Docker build context와 Dockerfile을 각각 확인하고 두 이미지를 로컬에서 빌드해 kind에서 실행한다. 실제 이미지가 준비되기 전 GHCR 게시나 AWS 배포를 완료로 표시하지 않는다.
+- news는 MVP에 포함할지 후속 기능으로 미룰지 정한다. 포함한다면 shared db_user로 저장이 되는지 검증하고, 미룬다면 README와 활성 Argo CD Application 범위를 일치시킨다.
+
+3단계 - 관측과 알림
+- Prometheus/Grafana를 이용해 collector Job 성공·실패, 마지막 성공 수집 시각, 데이터 freshness, DB/PVC 사용량을 확인한다.
+- 대시보드 패널과 알림 조건을 실제 수집 데이터로 검증한 뒤 Discord webhook은 Kubernetes Secret 등 비공개 설정으로 주입한다.
+- 정상·오류 사례를 실행하고 화면 및 로그 증거, 대응 절차를 기록한다.
+
+4단계 - Terraform과 AWS 설계
+- AWS 계정 연결 전에 월 예산 상한, 리전, 접근 방식, 예상 EC2/EBS/네트워크 비용을 확정한다. 검토 전에는 apply하지 않는다.
+- 먼저 remote Terraform state와 보호 설정을 설계한다. backend/OIDC 초기 구성에 필요한 선행 작업과 권한을 문서화한다.
+- Terraform으로 VPC, subnet, IGW, route, security group, EC2 role/profile, EC2 및 PostgreSQL용 EBS 설계를 코드화한다. MVP에서는 NAT Gateway를 피하고 필요한 egress와 관리 접근을 검증한다.
+- k3s API를 인터넷에 공개하지 않는다. SSM 또는 제한된 관리 경로를 선택하고 security group을 최소화한다.
+- EC2의 storageClass와 PVC가 전용 PostgreSQL volume에 연결되는 방법을 정한다. PVC request만으로 물리 2Gi 제한이 보장된다고 가정하지 않는다.
+- Cloudflare DNS는 서비스 흐름을 검증한 뒤 필요성이 확인될 때만 추가한다.
+
+5단계 - Ansible과 GitOps bootstrap
+- ansible/에 inventory 예시와 playbook을 만든다. 비밀값과 실제 inventory는 Git에 저장하지 않는다.
+- Ansible로 OS 기본 설정과 k3s server 설치를 수행한다.
+- Ansible로 Argo CD를 한 번 설치하고 root-app.yaml을 적용한다. 그 뒤에는 root Application이 Git의 child Application들을 관리하는 흐름을 확인한다.
+- EC2에서 GHCR image pull, DNS, PostgreSQL volume, Argo CD sync가 이어지는지 점검한다.
+
+6단계 - GitHub Actions 및 안전한 배포
+- PR workflow: YAML/Kustomize/Helm 검증, Python 검증 항목, Dockerfile/build 확인, Terraform fmt/validate/security scan/plan을 단계적으로 추가한다.
+- collector 코드 변경에만 image build/push가 실행되도록 path 조건을 둔다. Kubernetes/Helm 변경만으로 image build가 발생하지 않게 한다.
+- image는 재현 가능한 immutable SHA tag를 기본으로 사용한다. GHCR 게시 후 Kustomize image tag 업데이트를 PR로 반영한다.
+- Terraform plan과 apply를 분리하고 GitHub OIDC 최소 권한 role, protected Environment 승인, state lock을 구성한다. 장기 AWS key를 GitHub에 저장하지 않는다.
+- 실패·rollback 경로와 Terraform 변경으로 발생 가능한 비용을 plan에서 확인한다.
+
+완료 전 README 갱신
+- README의 현재 상태와 diagram을 실제 검증된 구성에 맞춘다. 지금 README의 starter/planned 표현과 동작 중인 파일 간 차이를 정리한다.
+- README가 가리키는 kubernetes/README.md가 현재 없으므로, 실제 경로로 링크를 고치거나 문서를 만든다.
+- verified / planned를 구분한다. Dashboard, Discord alert, AWS 배포, CI/CD 등 실제로 확인하지 않은 기능을 완료로 쓰지 않는다.
+- 로컬 kind와 AWS k3s 환경 차이, Terraform/Ansible/Argo CD 각 역할, PostgreSQL 2Gi storage 방식, 실행 및 장애 확인 절차를 간단히 기록한다.
+
+비용과 변경 통제
+- 이 TODO 작성 과정에서는 파일 삭제, AWS 리소스 생성, 유료 서비스 이용, Terraform apply를 하지 않았다.
+- AWS 작업은 비용 견적과 예산 승인을 확인한 뒤 별도로 진행한다.
+
+

@@ -6,4 +6,4 @@ metadata:
 
 provisioner: rancher.io/local-path
 
-reclaminPolicy: Retain
+reclaimPolicy: Retain
