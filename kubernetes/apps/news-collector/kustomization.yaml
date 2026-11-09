@@ -7,7 +7,7 @@ resources:
 
 images:
   - name: news-collector
-    newName: ghcr.io/dandapss/news-collector
+    newName: ghcr.io/dandapss/eip/news-collector
     newTag: 0.0.1
 
 commonLabels:

@@ -7,7 +7,7 @@ resources:
 
 images:
   - name: stock-collector
-    newName: ghcr.io/dandapss/stock-collector
+    newName: ghcr.io/dandapss/eip/stock-collector
     newTag: 0.0.1
 
 commonLabels:

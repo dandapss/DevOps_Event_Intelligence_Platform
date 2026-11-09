@@ -7,7 +7,7 @@ on:
 #  push:
 #    branches:
 #      - main
-#    path:
+#    paths:
 #      - 'src/news-collector/**'
 #      - 'src/stock-collector/**'
 #      - 'terraform/**'
@@ -27,7 +27,10 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      targets: ${{ steps.targets.outputs.targets }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+      ansible: ${{ steps.filter.outputs.ansible }}
+      kubernetes: ${{ steps.filter.outputs.kubernetes }}
+      images: ${{ steps.targets.outputs.images }}
 
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +39,7 @@ jobs:
         id: filter
         with:
           base: main
+          list-files: json
           filters: |
             terraform:
               - 'terraform/**'
@@ -46,11 +50,26 @@ jobs:
             kubernetes:
               - 'kubernetes/**'
 
-            image_stock:
-              - 'src/stock_collector/**'
+            images:
+              - 'src/*/**'
 
-            image_news:
-              - 'src/news_collector/**'
+      - name: Create changed image list
+        id: targets
+        env:
+          CHANGED_FILES: ${{ steps.filter.outputs.images_files }}
+        run: |
+          images=$(jq -c 'map(split("/")[1]) | unique' <<< "$CHANGED_FILES")
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+
+
+#------------------#
+# Change Check End #
+#------------------#
+
+
+#----------------#
+# Validate Start #
+#----------------#
 
   terraform-validate:
     needs: changes
@@ -73,21 +92,21 @@ jobs:
 
       - run: terraform validate
 
-   ansible-validate:
-     needs: changes
-     if: needs.changes.outputs.ansible == 'true'
+  ansible-validate:
+    needs: changes
+    if: needs.changes.outputs.ansible == 'true'
 
-     runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-     steps:
-       - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-       - run: pip install ansible ansible-lint
+      - run: pip install ansible ansible-lint
 
-       - run: ansible-lint
+      - run: ansible-lint
 
-       - run: |
-         find ansible -name "*.yml" -o -name "*.yaml"
+      - run: |
+        find ansible -name "*.yml" -o -name "*.yaml"
 
   kubernetes-validate:
     needs: changes
@@ -99,6 +118,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: azure/setup-helm@v4
+
+      - name: Download Helm dependencies
+        run: |
+          helm dependency build kubernetes/postgresql
+          helm dependency build kubernetes/grafana
+          helm dependency build kubernetes/prometheus
 
       - run: |
         helm lint kubernetes/postgresql
@@ -120,159 +145,121 @@ jobs:
 
   image-validate:
     needs: changes
-
-    image-validate:
-      strategy:
-        matrix:
-          image: ${{ fromJson(needs.changes.outputs.images )}}
-    if: needs.changes.outputs.image_stock == 'true'
-# Try to change this part, right now, image-change and image-validate are getting only true/false
-# I need them to get the result in JSON so no matter how many images they are,
-# I can still use validate and build image. 
-#====================================================================================#
-
-#------------------#
-# Change Check End #
-#------------------#
-
-
-#------------------#
-# Lint Check Start #
-#------------------#
-
-  strategy:
-    matrix:
-      target: ${{ fromJson(needs.changes.outputs.targets )}}
-
-  validate:
-    needs: changes
+    if: needs.changes.outputs.images != '[]'
 
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        target: ${{ fromJson(needs.changes.outputs.targets )}}
-
-
-
-  validate_kubernetes:
-    needs: change_kubernetes
-    if: needs.change_kubernetes.result == 'success'
-
-    permissions:
-      contents: read
-
-    runs-on: ubuntu-latest
+        image: ${{ fromJSON(needs.changes.outputs.images )}}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install yamllint
-        run: pip install yamllint
-
-      - name: YAML Lint
-        run: yamllint .
-
-      - name: Setup Helm
-        run: azure/setup-helm@v4
-
-      - name: Helm Lint
-        run: |
-          helm lint kubernetes/grafana > /dev/null
-          helm lint kubernetes/postgresql > /dev/null
-          helm lint kubernetes/prometheus > /dev/null
-
-      - name: Kustomize Check
-        run: |
-          kustomize build kubernetes/apps/news-collector > /dev/null
-          kustomize build kubernetes/apps/stock-collector > /dev/null
-          kustomize build kubernetes/argocd > /dev/null
-
-  validate_terraform:
-    needs: change_terraform
-    if: needs.change_terraform.result == 'success'
-
-    permissions:
-      contents: read
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Terraform Lint
-        run: |
-          terraform fmt -check -recursive terraform/
-          terraform init -backend=false terraform/
-          terraform validate terraform/
-
-  validate_ansible:
-    needs: change_terraform
-    if: needs.change_ansible.result == 'success'
-
-    permissions:
-      contents: read
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Ansible Lint
-        uses: ansible-actions/ansible-lint-action@v1.0.3
+      - uses: actions/setup-python@v5
         with:
-          target: "ansible/**"
+          python-version: "3.12"
 
-  validate_image:
-    needs: change_image
-    if: needs.change_image.result == 'success'
+      - name: Compile Python files
+        working-directory: src/${{ matrix.image }}
+        run: python -m compileall -q .
 
-    permissions:
-      contents: read
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Python Test Install
-        run: pip install python3
-
-      - name: Python Lint
-        run: |
-          python3 -m compileall src/news-collector/news-collector.py
-          python3 -m compileall src/stock-collector/stock-collecotr.py
-
-
-#----------------#
-# Lint Check End #
-#----------------#
+#--------------#
+# Validate End #
+#--------------#
 
 
 #--------------------#
 # Docker Build Start #
 #--------------------#
 
-  docker-build:
+  image-build:
     needs:
-      - change_image
-      - validate_image
-    if: needs.validate_image.result == 'true'
-    permissions:
-      contents: read
-      packages: write
+      - changes
+      - image-validate
 
+    if: needs.changes.outputs.images != '[]' && needs.image-validate.result == 'success'
+    permissions:
+      packages: write
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+
+    env:
+      IMAGE_NAME: ${{ matrix.image }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Docker Image Build
+      - name: Build image
         run: |
           docker build \
-          -t ghcr.io/dandapss/
-    
+          -t "ghcr.io/dandapss/eip/${IMAGE_NAME}:${GITHUB_SHA}" \
+          -t "ghcr.io/dandapss/eip/${IMAGE_NAME}:latest" "src/${IMAGE_NAME}"
+
+      - name: Login GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-actions@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Images
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push ghcr.io/dandapss/eip/${IMAGE_NAME}:${GITHUB_SHA}
+          docker push ghcr.io/dandapss/eip/${IMAGE_NAME}:latest
 
 #------------------#
 # Docker Build End #
+#------------------#
+
+#--------------------#
+# Updating Tag Start #
+#--------------------#
+
+  update-image-tag:
+    needs:
+      - changes
+      - image-build
+    if: github.ref == 'refs/heads/main' && needs.image-build.result == 'success'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+
+    env:
+      IMAGE_NAME: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update image tag
+        run: |
+          sed -i "s/^    newTag:.*/    newTag: ${GITHUB_SHA}/" kubernetes/apps/${IMAGE_NAME}/kustomization.yaml
+
+      - name: Commit and Push image tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add kubernetes/apps/${IMAGE_NAME}/kustomization.yaml
+
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+
+          git commit -m "Update image tag to ${GITHUB_SHA} [skip ci]"
+          git push origin HEAD:main
+
+
+#------------------#
+# Updating Tag End #
 #------------------#

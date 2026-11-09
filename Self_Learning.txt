@@ -24,3 +24,17 @@ Collector 차트와 현재 상태
 Stock 쪽은 이제 차트가 무엇을 가져오는지보다, 이 차트가 어떤 Kubernetes workload를 정의할지가 다음 학습 지점이에요. values.yaml로 설정을 분리하고 templates/에 CronJob을 정의한 뒤, 이미지와 함께 로컬 kind에서 실행하는 순서가 자연스럽습니다. News 차트도 같은 방식이지만 MVP 이후로 미룰 수 있어요.
 
 그리고 오늘은 파일을 읽기만 했고, 제가 수정하거나 배포한 내용은 없습니다. root-app 파일은 확인 과정 중 작업 폴더에서 잠시 보이지 않았지만 Git 최신 커밋에는 있었고, 이후 다시 확인했을 때 작업 폴더에도 존재했습니다. 제가 삭제한 건 아니며, 사라진 원인까지는 확인하지 못했습니다.
+
+오늘 고민한 내용 정리 (09. Nov. 2026)
+GitHub Actions의 변경 감지와 이미지 빌드
+- dorny/paths-filter에서 필터 이름이 `images`이면 기본 output은 변경 여부인 `true/false`입니다. `list-files: json`을 설정하면 변경된 파일 경로 목록인 `images_files`도 받을 수 있습니다.
+- `src/*/**`는 `src` 바로 아래 각 폴더의 하위 파일들을 가리킵니다. 예를 들어 `src/stock-collector/...`가 변경되면 파일 목록에서 `stock-collector`를 추출하고 `unique`로 중복을 제거해 이미지 matrix에 전달합니다. 그래서 stock 파일만 바뀌면 stock 이미지만 빌드 대상으로 들어갑니다.
+- 이미지 폴더 이름을 GHCR 이미지 이름과 같게 유지하면 `src/<이름>`에서 빌드해 `ghcr.io/dandapss/eip/<이름>`으로 push하는 식으로 연결할 수 있습니다. Kustomize의 `newName`도 같은 이미지 경로를 바라봐야 합니다.
+- GitHub Actions의 `${{ ... }}`는 workflow 안에서 GitHub가 값을 넣는 표기이고, `${NAME}`은 `run` 명령에서 Bash가 환경변수 값을 읽는 표기입니다. `run` 안에서는 GitHub가 표현식을 먼저 치환한 뒤 Bash가 실행되므로 두 표기를 모두 볼 수 있습니다. `GITHUB_SHA`는 runner가 자동으로 제공하는 커밋 SHA 환경변수입니다.
+Helm 차트 검증
+- `Chart.yaml`의 `dependencies`는 필요한 외부 차트와 버전을 선언합니다. CI runner에 실제 dependency 파일은 없으므로 `helm dependency build <차트 경로>`로 준비한 뒤 내 상위 차트의 lint/template 검사를 합니다. 이는 Bitnami 차트를 별도 검사하는 단계가 아닙니다.
+- Helm이 내려받은 dependency는 각 차트 디렉터리 아래 `charts/`에 놓입니다. CI runner 안에서 생성되므로 저장소에 직접 폴더를 만들거나 올릴 필요는 없습니다.
+- `helm lint kubernetes/postgresql`은 차트 경로를 검사합니다. `helm template kubernetes/postgresql`도 릴리스 이름을 생략하고 차트 경로만 지정한 유효한 형식입니다.
+오늘 확인한 CI 후속 점검
+- 이미지 빌드 job은 GHCR push를 위해 `packages: write`가 필요하고, checkout을 위해 `contents: read` 권한도 함께 지정해야 하는지 확인해야 합니다.
+- 이미지 빌드·push 경로와 stock/news 각각의 Kustomize `newName` 경로가 같은지 확인해야 합니다.
