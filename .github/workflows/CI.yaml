@@ -1,0 +1,278 @@
+# Created 9th of November 2026.
+# Last update 9th of November 2026.
+
+name: Event Intelligence Platform CI
+
+on:
+#  push:
+#    branches:
+#      - main
+#    path:
+#      - 'src/news-collector/**'
+#      - 'src/stock-collector/**'
+#      - 'terraform/**'
+#      - 'ansible/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+#--------------------#
+# Change Check Start #
+#--------------------#
+  
+  changes:
+    runs-on: ubuntu-latest
+
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: main
+          filters: |
+            terraform:
+              - 'terraform/**'
+
+            ansible:
+              - 'ansible/**'
+
+            kubernetes:
+              - 'kubernetes/**'
+
+            image_stock:
+              - 'src/stock_collector/**'
+
+            image_news:
+              - 'src/news_collector/**'
+
+  terraform-validate:
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -recursive
+
+      - run: terraform init -backend=false
+
+      - run: terraform validate
+
+   ansible-validate:
+     needs: changes
+     if: needs.changes.outputs.ansible == 'true'
+
+     runs-on: ubuntu-latest
+
+     steps:
+       - uses: actions/checkout@v4
+
+       - run: pip install ansible ansible-lint
+
+       - run: ansible-lint
+
+       - run: |
+         find ansible -name "*.yml" -o -name "*.yaml"
+
+  kubernetes-validate:
+    needs: changes
+    if: needs.changes.outputs.kubernetes == 'true'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - run: |
+        helm lint kubernetes/postgresql
+        helm lint kubernetes/grafana
+        helm lint kubernetes/prometheus
+
+      - run: |
+        helm template kubernetes/postgresql > /dev/null
+        helm template kubernetes/grafana > /dev/null
+        helm template kubernetes/prometheus > /dev/null
+
+      - run: pip install yamllint
+
+      - run: yamllint .
+
+      - run: |
+        kustomize build kubernetes/apps/news-collector > /dev/null
+        kustomize build kubernetes/apps/stock-collector > /dev/null
+
+  image-validate:
+    needs: changes
+
+    image-validate:
+      strategy:
+        matrix:
+          image: ${{ fromJson(needs.changes.outputs.images )}}
+    if: needs.changes.outputs.image_stock == 'true'
+# Try to change this part, right now, image-change and image-validate are getting only true/false
+# I need them to get the result in JSON so no matter how many images they are,
+# I can still use validate and build image. 
+#====================================================================================#
+
+#------------------#
+# Change Check End #
+#------------------#
+
+
+#------------------#
+# Lint Check Start #
+#------------------#
+
+  strategy:
+    matrix:
+      target: ${{ fromJson(needs.changes.outputs.targets )}}
+
+  validate:
+    needs: changes
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target: ${{ fromJson(needs.changes.outputs.targets )}}
+
+
+
+  validate_kubernetes:
+    needs: change_kubernetes
+    if: needs.change_kubernetes.result == 'success'
+
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: YAML Lint
+        run: yamllint .
+
+      - name: Setup Helm
+        run: azure/setup-helm@v4
+
+      - name: Helm Lint
+        run: |
+          helm lint kubernetes/grafana > /dev/null
+          helm lint kubernetes/postgresql > /dev/null
+          helm lint kubernetes/prometheus > /dev/null
+
+      - name: Kustomize Check
+        run: |
+          kustomize build kubernetes/apps/news-collector > /dev/null
+          kustomize build kubernetes/apps/stock-collector > /dev/null
+          kustomize build kubernetes/argocd > /dev/null
+
+  validate_terraform:
+    needs: change_terraform
+    if: needs.change_terraform.result == 'success'
+
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform Lint
+        run: |
+          terraform fmt -check -recursive terraform/
+          terraform init -backend=false terraform/
+          terraform validate terraform/
+
+  validate_ansible:
+    needs: change_terraform
+    if: needs.change_ansible.result == 'success'
+
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ansible Lint
+        uses: ansible-actions/ansible-lint-action@v1.0.3
+        with:
+          target: "ansible/**"
+
+  validate_image:
+    needs: change_image
+    if: needs.change_image.result == 'success'
+
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python Test Install
+        run: pip install python3
+
+      - name: Python Lint
+        run: |
+          python3 -m compileall src/news-collector/news-collector.py
+          python3 -m compileall src/stock-collector/stock-collecotr.py
+
+
+#----------------#
+# Lint Check End #
+#----------------#
+
+
+#--------------------#
+# Docker Build Start #
+#--------------------#
+
+  docker-build:
+    needs:
+      - change_image
+      - validate_image
+    if: needs.validate_image.result == 'true'
+    permissions:
+      contents: read
+      packages: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Image Build
+        run: |
+          docker build \
+          -t ghcr.io/dandapss/
+    
+
+#------------------#
+# Docker Build End #
+#------------------#

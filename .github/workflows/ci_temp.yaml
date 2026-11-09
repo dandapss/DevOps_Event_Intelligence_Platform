@@ -1,0 +1,147 @@
+# trying to use Json format for multiple applications. 
+# I only have two for now, news and collector, so there is no big meaning
+# Try to understand the difference between hard coded CI.yaml and this AI generated yaml.
+# Make my own CI file and apply it to github
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  change-detect:
+    runs-on: ubuntu-latest
+
+    outputs:
+      terraform: ${{ steps.filter.outputs.terraform }}
+      ansible: ${{ steps.filter.outputs.ansible }}
+      image: ${{ steps.filter.outputs.image }}
+      kubernetes: ${{ steps.filter.outputs.kubernetes }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            terraform:
+              - 'terraform/**'
+
+            ansible:
+              - 'ansible/**'
+
+            image:
+              - 'src/**'
+              - 'Dockerfile'
+              - 'requirements.txt'
+
+            kubernetes:
+              - 'argocd/**'
+              - 'postgresql/**'
+              - 'grafana/**'
+              - 'prometheus/**'
+              - 'kubernetes/**'
+
+  terraform-validate:
+    needs: change-detect
+    if: needs.change-detect.outputs.terraform == 'true'
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform fmt -check -recursive
+
+      - run: terraform init -backend=false
+
+      - run: terraform validate
+
+  ansible-validate:
+    needs: change-detect
+    if: needs.change-detect.outputs.ansible == 'true'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: pip install ansible ansible-lint
+
+      - run: ansible-lint
+
+      - run: |
+          find ansible -name "*.yml" -o -name "*.yaml"
+
+  kubernetes-validate:
+    needs: change-detect
+    if: needs.change-detect.outputs.kubernetes == 'true'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - run: |
+          helm lint postgresql
+          helm lint grafana
+          helm lint prometheus
+
+      - run: |
+          helm template postgresql > /dev/null
+          helm template grafana > /dev/null
+          helm template prometheus > /dev/null
+
+      - run: pip install yamllint
+
+      - run: yamllint .
+
+      - run: |
+          kustomize build kubernetes/apps/news-collector > /dev/null
+          kustomize build kubernetes/apps/stock-collector > /dev/null
+
+  image-validate:
+    needs: change-detect
+    if: needs.change-detect.outputs.image == 'true'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python3 -m compileall src
+
+  image-build:
+    needs:
+      - change-detect
+      - image-validate
+
+    if: |
+      always() &&
+      needs.image-validate.result == 'success'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: echo "docker build 단계"
