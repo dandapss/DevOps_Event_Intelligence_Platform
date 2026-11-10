@@ -35,12 +35,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: dorny/paths-filter@v3
         name: Check the modified One
         id: filter
         with:
-          base: main
           list-files: json
           filters: |
             terraform:
@@ -73,6 +74,13 @@ jobs:
           echo "ansible=${{ needs.changes.outputs.ansible }}"
           echo "kubernetes=${{ needs.changes.outputs.kubernetes }}"
           echo "images=${{ needs.changes.outputs.images }}"
+
+      - name: Debug Git
+        run: |
+          echo "EVENT=${{ github.event_name }}"
+          echo "REF=${{ github.ref }}"
+          git branch -a
+          git log --oneline -5
 
 #------------------#
 # Change Check End #
