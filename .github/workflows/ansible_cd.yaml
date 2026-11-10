@@ -1,2 +1,29 @@
 concurrency:
   group: ansible
+
+name: Ansible CD
+
+on:
+  workflow_call:
+
+permission:
+  contents: read
+  # Need permission to connect with EC2
+
+concurrency:
+  group: ansible
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ansible
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Here goes the connection with EC2 or AWS, whatever that is needed
+
+      

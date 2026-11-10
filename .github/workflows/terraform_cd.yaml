@@ -1,2 +1,45 @@
+name: Terraform CD
+
+on:
+  workflow_call:
+
+permission:
+  contents: read
+  # Get OIDC Token
+  id-token: write
+
 concurrency:
   group: terraform
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::11111111111:role/github-actions-terraform
+          aws-region: eu-central-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply
+
+  ansible-cd:
+    needs: terraform-apply
+
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.terraform-apply.result == 'success'
+
+    uses: ./.github/workflows/ansible_cd.yaml

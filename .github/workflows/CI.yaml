@@ -169,9 +169,30 @@ jobs:
 #--------------#
 
 
-#--------------------#
-# Docker Build Start #
-#--------------------#
+ # if called ---------#
+ # Terraform CD Start #
+ #--------------------#
+
+  terraform-cd:
+    needs:
+      - changes:
+      - terraform-validate
+
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.terraform == 'true' &&
+      needs.terraform-validate.result == 'success'
+
+    uses: ./.github/workflows/terraform_cd.yaml
+
+ #------------------#
+ # Terraform CD End #
+ #------------------#
+
+
+ # if called ---------#
+ # Docker Build Start #
+ #--------------------#
 
   image-build:
     needs:
@@ -214,13 +235,14 @@ jobs:
           docker push ghcr.io/dandapss/eip/${IMAGE_NAME}:${GITHUB_SHA}
           docker push ghcr.io/dandapss/eip/${IMAGE_NAME}:latest
 
-#------------------#
-# Docker Build End #
-#------------------#
+ #------------------#
+ # Docker Build End #
+ #------------------#
 
-#--------------------#
-# Updating Tag Start #
-#--------------------#
+
+ # if called ---------#
+ # Updating Tag Start #
+ #--------------------#
 
   update-image-tag:
     needs:
@@ -260,6 +282,6 @@ jobs:
           git push origin HEAD:main
 
 
-#------------------#
-# Updating Tag End #
-#------------------#
+ #------------------#
+ # Updating Tag End #
+ #------------------#
