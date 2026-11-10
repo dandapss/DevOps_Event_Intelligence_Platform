@@ -3,7 +3,7 @@ name: Ansible CD
 on:
   workflow_call:
 
-permission:
+permissions:
   contents: read
   # Need permission to connect with EC2
 

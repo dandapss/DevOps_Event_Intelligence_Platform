@@ -4,14 +4,14 @@
 name: Event Intelligence Platform CI
 
 on:
-#  push:
-#    branches:
-#      - main
-#    paths:
-#      - 'src/news-collector/**'
-#      - 'src/stock-collector/**'
-#      - 'terraform/**'
-#      - 'ansible/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/news-collector/**'
+      - 'src/stock-collector/**'
+      - 'terraform/**'
+      - 'ansible/**'
   workflow_dispatch:
 
 permissions:

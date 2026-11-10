@@ -3,7 +3,7 @@ name: Terraform CD
 on:
   workflow_call:
 
-permission:
+permissions:
   contents: read
   # Get OIDC Token
   id-token: write
