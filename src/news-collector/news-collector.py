@@ -24,7 +24,6 @@ def get_connection():
     password=DB_PASSWORD
   ) 
 
-
 def get_news_data(symbol: str):
   url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
   print(url)

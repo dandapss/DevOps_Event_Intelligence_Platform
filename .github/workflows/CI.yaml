@@ -1,5 +1,5 @@
 # Created 9th of November 2026.
-# Last update 9th of November 2026.
+# Last update 10th of November 2026.
 
 name: Event Intelligence Platform CI
 
@@ -255,7 +255,7 @@ jobs:
 
       - name: Login GHCR
         if: github.ref == 'refs/heads/main'
-        uses: docker/login-actions@v3
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

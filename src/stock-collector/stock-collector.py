@@ -78,6 +78,7 @@ def save_stock(data: dict):
   finally:
     conn.close()
 
+
 def main():
   failed = False
 
