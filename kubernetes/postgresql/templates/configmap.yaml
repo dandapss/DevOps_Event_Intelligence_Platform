@@ -5,4 +5,4 @@ metadata:
 
 data:
   schema.sql: |-
-{{ .Files.Get "schema.sql" | indent 4 }}
+{{ .Files.Get "schema.sql" | nindent 4 }}

@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: stock-collector-config
 data:
-  DB_HOST : "postgresql"
-  DB_PORT : "5432"
-  DB_NAME : "event_intelligence"
-  SYMBOLS : "MSFT,NVDA,TSM"
+  DB_HOST: "postgresql"
+  DB_PORT: "5432"
+  DB_NAME: "event_intelligence"
+  SYMBOLS: "MSFT,NVDA,TSM"

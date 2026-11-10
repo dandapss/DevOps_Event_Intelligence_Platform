@@ -12,10 +12,10 @@ postgresql:
       storageClass: postgres-storage
 
     extraVolumes:
-    - name: schema
-      configMap:
-        name: postgres-schema
+      - name: schema
+        configMap:
+          name: postgres-schema
 
     extraVolumeMounts:
-    - name: schema
-      mountPath: /docker-entrypoint-initdb.d
+      - name: schema
+        mountPath: /docker-entrypoint-initdb.d

@@ -300,6 +300,27 @@ jobs:
         run: |
           sed -i "s/^    newTag:.*/    newTag: ${GITHUB_SHA}/" kubernetes/apps/${IMAGE_NAME}/kustomization.yaml
 
+  push-image-tag:
+    needs:
+      - changes
+      - image-build
+      - update-image-tag
+    if: github.ref == 'refs/heads/main' && needs.update-image-tag.result == 'success'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+
+    env:
+      IMAGE_NAME: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Commit and Push image tag
         run: |
           git config user.name "github-actions[bot]"
