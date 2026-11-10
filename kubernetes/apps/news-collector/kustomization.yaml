@@ -9,7 +9,3 @@ images:
   - name: news-collector
     newName: ghcr.io/dandapss/eip/news-collector
     newTag: 0.0.1
-
-labels:
-  app.kubernetes.io/name: news-collector
-  app.kubernetes.io/part-of: event-intelligence-platform

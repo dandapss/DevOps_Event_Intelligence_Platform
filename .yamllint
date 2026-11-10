@@ -5,4 +5,4 @@ rules:
   document-start: disable
 
 ignore: |
-  kubernetes/postgres/templates/configmap.yaml
+  kubernetes/postgresql/templates/configmap.yaml
