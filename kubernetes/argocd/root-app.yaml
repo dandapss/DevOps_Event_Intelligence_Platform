@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/dandapss/DevOps_Event_Intelligence_Platform.git
     targetRevision: main
-    path: kubernetes/argocd
+    path: kubernetes
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
