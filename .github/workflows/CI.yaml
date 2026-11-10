@@ -185,7 +185,7 @@ jobs:
 
   terraform-cd:
     needs:
-      - changes:
+      - changes
       - terraform-validate
 
     if: |
