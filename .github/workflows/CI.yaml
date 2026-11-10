@@ -8,10 +8,11 @@ on:
     branches:
       - main
     paths:
-      - 'src/news-collector/**'
-      - 'src/stock-collector/**'
+      - 'src/**'
+      - 'kubernetes/**'
       - 'terraform/**'
       - 'ansible/**'
+      - '.github/workflows/CI.yaml'
   workflow_dispatch:
 
 permissions:
@@ -36,6 +37,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dorny/paths-filter@v3
+        name: Check the modified One
         id: filter
         with:
           base: main
@@ -97,10 +99,13 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
 
       - run: terraform fmt -check -recursive
+        name: Terraform format check
 
       - run: terraform init -backend=false
+        name: Terraform init check
 
       - run: terraform validate
+        name: Terraform validate
 
   ansible-validate:
     needs: changes
@@ -135,21 +140,26 @@ jobs:
           helm dependency build kubernetes/grafana
           helm dependency build kubernetes/prometheus
 
-      - run: |
+      - name: Helm Lint test
+        run: |
           helm lint kubernetes/postgresql
           helm lint kubernetes/grafana
           helm lint kubernetes/prometheus
 
-      - run: |
+      - name: Helm template test
+        run: |
           helm template kubernetes/postgresql > /dev/null
           helm template kubernetes/grafana > /dev/null
           helm template kubernetes/prometheus > /dev/null
 
       - run: pip install yamllint
+        name: Install Yamllint
 
       - run: yamllint .
+        name: Test yamllint
 
-      - run: |
+      - name: Kustomize build test
+        run: |
           kustomize build kubernetes/apps/news-collector > /dev/null
           kustomize build kubernetes/apps/stock-collector > /dev/null
 
