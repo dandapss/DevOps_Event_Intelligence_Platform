@@ -62,7 +62,7 @@ jobs:
           echo "images=$images" >> "$GITHUB_OUTPUT"
 
   debug:
-    needs: changes:
+    needs: changes
     runs-on: ubuntu-latest
 
     steps:
