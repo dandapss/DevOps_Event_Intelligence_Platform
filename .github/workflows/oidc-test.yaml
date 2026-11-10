@@ -1,0 +1,24 @@
+name: OIDC connection test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-aws-identity:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::236608206962:role/eip-github-actions-terraform
+          aws-region: eu-central-1
+
+      - name: Confirm AWS identity
+        run: aws sts get-caller-identity
