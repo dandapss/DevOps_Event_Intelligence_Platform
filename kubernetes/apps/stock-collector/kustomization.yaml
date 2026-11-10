@@ -10,6 +10,6 @@ images:
     newName: ghcr.io/dandapss/eip/stock-collector
     newTag: 0.0.1
 
-commonLabels:
+labels:
   app.kubernetes.io/name: stock-collector
   app.kubernetes.io/part-of: event-intelligence-platform

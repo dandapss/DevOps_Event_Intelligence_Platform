@@ -8,6 +8,6 @@ resources:
   - ../apps/news-collector/application.yaml
   - ../postgresql/application.yaml
 
-commonLabels:
+labels:
   app.kubernetes.io/managed-by: argocd
   app.kubernetes.io/part-of: event-intelligence-platform
