@@ -61,6 +61,16 @@ jobs:
           images=$(jq -c 'map(split("/")[1]) | unique' <<< "$CHANGED_FILES")
           echo "images=$images" >> "$GITHUB_OUTPUT"
 
+  debug:
+    needs: changes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: |
+          echo "terraform=${{ needs.changes.outputs.terraform }}"
+          echo "ansible=${{ needs.changes.outputs.ansible }}"
+          echo "kubernetes=${{ needs.changes.outputs.kubernetes }}"
+          echo "images=${{ needs.changes.outputs.images }}"
 
 #------------------#
 # Change Check End #
@@ -106,7 +116,7 @@ jobs:
       - run: ansible-lint
 
       - run: |
-        find ansible -name "*.yml" -o -name "*.yaml"
+          find ansible -name "*.yml" -o -name "*.yaml"
 
   kubernetes-validate:
     needs: changes
@@ -126,22 +136,22 @@ jobs:
           helm dependency build kubernetes/prometheus
 
       - run: |
-        helm lint kubernetes/postgresql
-        helm lint kubernetes/grafana
-        helm lint kubernetes/prometheus
+          helm lint kubernetes/postgresql
+          helm lint kubernetes/grafana
+          helm lint kubernetes/prometheus
 
       - run: |
-        helm template kubernetes/postgresql > /dev/null
-        helm template kubernetes/grafana > /dev/null
-        helm template kubernetes/prometheus > /dev/null
+          helm template kubernetes/postgresql > /dev/null
+          helm template kubernetes/grafana > /dev/null
+          helm template kubernetes/prometheus > /dev/null
 
       - run: pip install yamllint
 
       - run: yamllint .
 
       - run: |
-        kustomize build kubernetes/apps/news-collector > /dev/null
-        kustomize build kubernetes/apps/stock-collector > /dev/null
+          kustomize build kubernetes/apps/news-collector > /dev/null
+          kustomize build kubernetes/apps/stock-collector > /dev/null
 
   image-validate:
     needs: changes
