@@ -101,7 +101,7 @@ def main():
         conn.rollback()
         failed = True
         print(f"[FAILED] {symbol}: {e}")      
-
+        print(f"[DEBUG] RSS URL = {url}")
 
   finally:
     conn.close()
