@@ -51,6 +51,7 @@ def get_stock_data(symbol: str):
     "collected_at": datetime.utcnow()
   }
 
+
 def save_stock(data: dict):
   conn = get_connection()
 

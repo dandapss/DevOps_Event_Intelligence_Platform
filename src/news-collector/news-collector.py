@@ -58,7 +58,6 @@ def save_news(data: dict, conn):
         )
       )
 
-
 def main():
   try:
     conn = get_connection()
