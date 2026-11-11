@@ -8,4 +8,4 @@ resources:
 images:
   - name: news-collector
     newName: ghcr.io/dandapss/eip/news-collector
-    newTag: e53b5cd01abf7643dd68ea6f770f115c2cd39c2c
+    newTag: 2dafee6ccc29019cfb44bd7ada4e41c0ec7ad331
