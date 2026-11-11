@@ -28,9 +28,7 @@ def get_news_data(symbol: str):
   url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
   print(url)
 
-########
-# Temp #
-########
+  # This url is not letting python to read so changing it to Mozilla
   req = Request(url,headers={"User-Agent": "Mozilla/5.0"})
 
   with urlopen(req, timeout=10) as response:

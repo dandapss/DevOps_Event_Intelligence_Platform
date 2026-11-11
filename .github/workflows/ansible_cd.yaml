@@ -1,3 +1,4 @@
+# Last update on 11th Nov. 2026
 name: Ansible CD
 
 on:
@@ -5,7 +6,8 @@ on:
 
 permissions:
   contents: read
-  # Need permission to connect with EC2
+# It will be enabled when aws is setup
+  # id-toekn: write
 
 concurrency:
   group: ansible
@@ -21,4 +23,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Here goes the connection with EC2 or AWS, whatever that is needed
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+# It will be changed to Frankfurt
+          aws-region: ap-northease-2
+
+      - name: Get GitHub Runner IP
+        id: ip
+        run: |
+          echo "ip=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
+
+      - name: Allow SSH
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.EC2_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ip }}/32
+
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+
+      - name: Create SSH Key
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Run Ansible
+        run: |
+          ansible-playbook \
+            -i inventory.ini \
+            site.yaml
+
+      - name: Revoke SSH
+        if: always()
+        run: |
+          aws ec2 revok-security-group-ingress \
+            --group-id ${{ secrets.EC2_SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ip }}/32

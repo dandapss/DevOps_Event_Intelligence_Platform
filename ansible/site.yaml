@@ -1,0 +1,5 @@
+# Running all the ansible in order
+
+import_playbook: k3s/install.yaml
+
+import_playbook: argocd/install.yaml

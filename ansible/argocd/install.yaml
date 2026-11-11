@@ -1,0 +1,31 @@
+name: Install ArgoCD
+hosts: k3s
+# what is "become true"? am i Jesus? 
+become: true
+
+taks:
+  - name: Add ArgoCD Helm Repo
+    shell: |
+      helm repo add argo https://argoproj.github.io/argo-helm
+      helm repo update
+
+  - name: Install ArgoCD
+    shell: |
+      helm upgrade --install argocd argo/argo-cd \
+        --namespace argocd \
+        --create-namespace\
+        -f {{ playbook_dir }}/values.yaml
+
+  - name: Wait for ArgoCD Server
+    shell: |
+      kubectl get deployment argocd-server \
+      -n argocd \
+      -o jsonpath='{.status.readyReplicas}'
+    register: argocd_status
+    retries: 30
+    delay: 10
+    until: argocd_status.stdout == "1"
+
+  - name: Show ArgoCD Status
+    debug:
+      var: argocd_status.stdout

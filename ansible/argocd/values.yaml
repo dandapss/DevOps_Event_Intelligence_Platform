@@ -1,0 +1,8 @@
+server:
+  service:
+    type: NodePort
+
+# using "server.insecure: true" becuase it is Lab
+configs:
+  params:
+    server.insecure: true

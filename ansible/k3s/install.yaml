@@ -1,0 +1,38 @@
+name: Install k3s
+hosts: e2c
+become: true
+
+taks:
+  - name: Update apt cache
+    apt:
+      update_cache: true
+
+  - name: Install required packages
+    apt:
+      name:
+        - curl
+      state: present
+
+  # s: silent, f: detect failure, L: follow redirection
+  - name: Install k3s
+    shell: |
+      curl -sfL https://get.k3s.io | sh -
+    args:
+      creates: /usr/local/bin/k3s
+
+  - name: Start and Enable k3s service
+    systemd:
+      name: k3s
+      state: started
+      enabled: true
+
+  - name: Wait for node ready
+    shell: kubectl get nodes --no-headers
+    register: node_status
+    retries: 30
+    delay: 5
+    until: "'Ready' in node_status.stdout"
+
+  - name: Show node status
+    debug:
+      var: node_status.stdout_lines
