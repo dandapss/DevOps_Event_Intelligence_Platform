@@ -28,7 +28,12 @@ def get_news_data(symbol: str):
   url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
   print(url)
 
-  with urlopen(url, timeout=10) as response:
+########
+# Temp #
+########
+  req = Request(url,headers={"User-Agent": "Mozilla/5.0"})
+
+  with urlopen(req, timeout=10) as response:
     feed = fp.parse(response.read())
 
   if not feed.entries:
@@ -101,7 +106,6 @@ def main():
         conn.rollback()
         failed = True
         print(f"[FAILED] {symbol}: {e}")      
-        print(f"[DEBUG] RSS URL = {url}")
 
   finally:
     conn.close()
