@@ -5,6 +5,11 @@ postgresql:
     password: db_password
     database: event_intelligence
 
+  image:
+    registry: docker.io
+    repository: bitnami/postgresql
+    tag: latest
+
   primary:
     persistence:
       enabled: true
