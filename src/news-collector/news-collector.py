@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 import psycopg2
 import feedparser as fp
 
