@@ -102,6 +102,7 @@ def main():
         failed = True
         print(f"[FAILED] {symbol}: {e}")      
 
+
   finally:
     conn.close()
 
