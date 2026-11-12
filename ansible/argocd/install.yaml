@@ -3,7 +3,7 @@ hosts: k3s
 # what is "become true"? am i Jesus? 
 become: true
 
-taks:
+tasks:
   - name: Add ArgoCD Helm Repo
     shell: |
       helm repo add argo https://argoproj.github.io/argo-helm

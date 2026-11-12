@@ -27,8 +27,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-# It will be changed to Frankfurt
-          aws-region: ap-northease-2
+          aws-region: eu-central-1
 
       - name: Get GitHub Runner IP
         id: ip

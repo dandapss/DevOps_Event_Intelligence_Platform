@@ -41,3 +41,10 @@ Workflow
 6. Grafana
    - Alert which hits the criteria
    - Show necessary information through dashboard
+
+
+## Some Personal Notes
+1. Try to add "terraform validate" and "terraform fmt" in terraform CD
+  - terraform validate : It is like lint
+  - terraform fmt : It fixes the format of the file
+  - terraform fmt needs to go first, because it looks goooood! 

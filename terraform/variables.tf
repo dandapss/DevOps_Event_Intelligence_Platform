@@ -11,3 +11,11 @@ variable "project_name" {
   type        = string
   default     = "event-intelligence"
 }
+
+variable "instance_type" {
+  type = string
+}
+
+variable "key_name" {
+  type = string
+}
