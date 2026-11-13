@@ -14,6 +14,13 @@ variable "project_name" {
 
 variable "instance_type" {
   type = string
+  default = t3.micro
+}
+
+variable "instance_ami" {
+  type = string
+  default = [ami_number]
+  description = "ami usable to run k3s"
 }
 
 variable "key_name" {
