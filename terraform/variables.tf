@@ -26,3 +26,9 @@ variable "instance_ami" {
 variable "key_name" {
   type = string
 }
+
+variable "Manager" {
+  type = string
+  description = "Who is managing the project?!"
+  default = "Seob"
+}
