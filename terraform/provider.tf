@@ -8,7 +8,8 @@ provider "aws" {
     tags = {
       Project   = var.project_name
       ManagedBy = "Terraform"
-      Environment = "prod"
+      Environment = var.environment
+      Manager = var.manager
     }
   }
 }

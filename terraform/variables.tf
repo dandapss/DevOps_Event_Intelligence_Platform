@@ -12,6 +12,12 @@ variable "project_name" {
   default     = "event-intelligence"
 }
 
+variable "environment" {
+  description = "deploy environment"
+  type = "string"
+  default = "prod"
+}
+
 variable "instance_type" {
   type = string
   default = t3.micro
@@ -27,7 +33,30 @@ variable "key_name" {
   type = string
 }
 
-variable "Manager" {
+variable "vpc_cidr" {
+  description = "Project VPC cidr"
+  type = "string"
+  default = "10.20.0.0/16"
+}
+
+variable "public_subnet_cidr" {
+  description = "Public Subnet cidr for ec2"
+  type = string
+  default = "10.20.1.0/24"
+}
+
+variable "root_volume_size_gib" {
+  description = "Disk size for ec2 os"
+  type = number
+  default = 8
+
+  validation {
+    condition = var.root_volume_size_gib >= 8
+    error_message = "root volume should be minimal 8 GB"
+  }
+}
+
+variable "manager" {
   type = string
   description = "Who is managing the project?!"
   default = "Seob"
