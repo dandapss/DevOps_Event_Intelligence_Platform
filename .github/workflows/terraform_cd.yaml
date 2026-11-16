@@ -24,7 +24,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::11111111111:role/github-actions-terraform
+          role-to-assume: arn:aws:iam::236608206962:role/eip-github-actions-terraform
           aws-region: eu-central-1
 
       - uses: hashicorp/setup-terraform@v3
@@ -32,8 +32,11 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Plan
+        run: terraform plan
+
       - name: Terraform Apply
-        run: terraform apply
+        run: terraform apply --auto-approve
 
   ansible-cd:
     needs: terraform-apply
