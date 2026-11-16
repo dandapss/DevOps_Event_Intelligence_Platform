@@ -31,19 +31,41 @@ resource "aws_vpc" "seob_vpc" {
 #--------#
 # Subnet #
 #--------#
-
+resource "aws_subnet" "seob_subnet" {
+  vpc_id = aws_vpc.seob_vpc.id
+  cidr_block = "10.10.10.0/24"
+}
 
 #------------------#
 # Internet Gateway #
 #------------------#
+resource "aws_internet_gateway" "seob_gateway" {
+  vpc_id = aws_vpc.seob_vpc.id
+}
+
 
 #-------------#
 # Route Table #
 #-------------#
+resource "aws_route_table" "seob_route_table" {
+  vpc_id = aws_vpc.seob_vpc.id
+
+  route {
+    cidr_block = "10.10.10.0/24"
+    gateway_id = aws_internet_gateway.seob_gateway.id
+  }
+}
+
 
 #----------------#
 # Security Group #
 #----------------#
+resource "aws_security_group" "seob_sg" {
+  name = "Temp_SSH"
+  description = "Opening SSH temporarily for the deployment workflow"
+  vpc_id = aws_vpc.seob_vpc.id
+}
+
 
 #-----#
 # IAM #
