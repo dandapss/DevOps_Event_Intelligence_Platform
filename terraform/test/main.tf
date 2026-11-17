@@ -194,3 +194,18 @@ resource "aws_cloudtrail" "seob_cloudtrail" {
   depends_on = [aws_s3_bucket.seob_s3]
 }
 
+resource "aws_ebs_volume" "postgres" {
+  availability_zone = aws_subnet.seob_subnet.availability_zone
+  size = 2
+  type = "gp3"
+  encrypted = true
+
+  lifecycle {prevent_destroy = true}
+}
+
+resource "aws_volume_attachment" "postgres" {
+  device_name = "/dev/sdf"
+  volume_id = aws_ebs_volume.postgres.id
+  instance_id = aws_instance.seob_vm.id
+  skip_destroy = true
+}

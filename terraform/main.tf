@@ -119,12 +119,12 @@ resource "aws_ebs_volume" "postgres" {
 }
 
 
-resource "aws_volume_attachmnet" "postgres" {
+resource "aws_volume_attachment" "postgres" {
   device_name = "/dev/sdf"
   volume_id = aws_ebs_volume.postgres.id
   instance_id = aws_instance.eip.id
 
-  skip_destry = true
+  skip_destroy = true
 }
 
 # created
