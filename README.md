@@ -6,40 +6,73 @@ A personal DevOps project for collecting stock market data on a schedule and sto
 
 ```mermaid
 flowchart TB
-  Dev[Developer] --> Repo[GitHub repository]
-  Repo --> Actions[GitHub Actions]
-  Actions -->|Build and publish changed collector images| GHCR[GHCR]
-  Actions -.->|Terraform workflow - in progress| TF[Terraform]
-  TF -.->|Planned infrastructure| VPC[AWS VPC and EC2]
+  Dev[Developer]
 
-  Repo -->|GitOps manifests| ArgoLocal[Argo CD - local]
-  Repo -->|GitOps manifests| ArgoProd[Argo CD - AWS target]
-  GHCR -->|Pull image| AppsLocal[Local Kubernetes workloads]
-  GHCR -.->|Pull image - planned| AppsProd[AWS k3s workloads]
-  ArgoLocal --> AppsLocal
-  ArgoProd -.-> AppsProd
-
-  subgraph Local[Development target - local kind]
-    ArgoLocal
-    AppsLocal
+  subgraph GitHub["GitHub"]
+    Repo[Repository]
+    subgraph Actions["GitHub Actions"]
+      CI[Validation and image workflow]
+      TF[Terraform workflow - in progress]
+    end
+    subgraph Registry["GHCR"]
+      StockImage[Stock collector image]
+      NewsImage[News collector image]
+    end
+    Repo --> CI
+    CI -->|Build and publish changed images| StockImage
+    CI -->|Build and publish changed images| NewsImage
+    CI -.-> TF
   end
 
-  subgraph Cloud[Production target - AWS EC2 with k3s]
-    VPC --> K3s[k3s]
-    K3s --> ArgoProd
-    K3s --> AppsProd
-    EBS[Dedicated EBS volume] -.-> PGData[PostgreSQL data - planned]
+  Dev --> Repo
+  TF -.->|Planned infrastructure| VPC
+  Repo -.->|GitOps sync| ArgoLocal
+  Repo -.->|GitOps sync| ArgoProd
+
+  subgraph Local["Development - local kind"]
+    ArgoLocal[Argo CD]
+    subgraph LocalK8s["Kubernetes workloads"]
+      LStock[Stock CronJob]
+      LNews[News CronJob]
+      LPostgres[PostgreSQL]
+      LProm[Prometheus]
+      LGrafana[Grafana]
+    end
+    ArgoLocal --> LocalK8s
+    LStock --> LPostgres
+    LNews --> LPostgres
+    LocalK8s -.-> LProm
+    LProm -.-> LGrafana
   end
 
-  StockAPI[Stock data provider] --> Stock[Stock collector CronJob]
-  NewsRSS[Yahoo Finance RSS] --> News[News collector CronJob]
-  AppsLocal --> Stock
-  AppsLocal --> News
-  Stock --> PGLocal[PostgreSQL]
-  News --> PGLocal
-  AppsLocal -.-> Prom[Prometheus]
-  Prom -.-> Grafana[Grafana]
-  Grafana -.-> Discord[Discord alerts - planned]
+  subgraph AWS["Production target - AWS"]
+    VPC[VPC and subnet] --> EC2[EC2 Linux host]
+    EC2 --> K3s[k3s]
+    K3s --> ArgoProd[Argo CD]
+    ArgoProd --> ProdK8s
+    subgraph ProdK8s["k3s workloads"]
+      PStock[Stock CronJob]
+      PNews[News CronJob]
+      PPostgres[PostgreSQL]
+      PProm[Prometheus]
+      PGrafana[Grafana]
+    end
+    PStock --> PPostgres
+    PNews --> PPostgres
+    ProdK8s -.-> PProm
+    PProm -.-> PGrafana
+    EBS[Dedicated 2 GiB EBS volume] -.-> PPostgres
+  end
+
+  StockImage --> LStock
+  NewsImage --> LNews
+  StockImage -.-> PStock
+  NewsImage -.-> PNews
+  StockAPI[External stock data provider] --> LStock
+  StockAPI --> PStock
+  NewsRSS[Yahoo Finance RSS] --> LNews
+  NewsRSS --> PNews
+  PGrafana -.-> Discord[Discord alerts - planned]
 ```
 
 ## Current status
@@ -70,4 +103,7 @@ No AWS infrastructure is currently deployed. EC2, EBS, networking, and logging s
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [AWS setup checklist](docs/AWS_CONNECTIONS.md)
 - [Terraform notes](terraform/README.md)
+
+
+
 
