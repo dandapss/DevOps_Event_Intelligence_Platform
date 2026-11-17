@@ -21,18 +21,11 @@ resource "aws_instance" "seob_vm" {
   }
 }
 
-#----#
-# S3 #
-#----#
-resource "aws_s3_bucket" "seob_s3" {
-  bucket = var.s3_bucket_name
-}
-
 #-----#
 # VPC #
 #-----#
 resource "aws_vpc" "seob_vpc" {
-  cidr_block = "10.10.0.0/16"
+  cidr_block = var.vpc_cidr
   enable_dns_support = true
   enable_dns_hostnames = true
 
@@ -46,8 +39,8 @@ resource "aws_vpc" "seob_vpc" {
 #--------#
 resource "aws_subnet" "seob_subnet" {
   vpc_id = aws_vpc.seob_vpc.id
-  cidr_block = "10.10.10.0/24"
-  availability_zone = "eu-central-1a"
+  cidr_block = var.subnet_cidr
+  availability_zone = var.availability_zone
   map_public_ip_on_launch = true
 
   tags = {
@@ -94,8 +87,8 @@ resource "aws_route_table_association" "seob_r_associate" {
 # Security Group #
 #----------------#
 resource "aws_security_group" "seob_sg" {
-  name = "Temp_SSH"
-  description = "Only allowing egress"
+  name = "seob-ec2"
+  description = "Outbound access for the EIP EC2 instance"
   vpc_id = aws_vpc.seob_vpc.id
 
   egress {
@@ -130,6 +123,7 @@ resource "aws_iam_user" "users" {
 resource "aws_iam_role" "ec2_role" {
   description = "IAM role for cloud watch"
   name = "seob-ec2-role"
+  assum_role_policy = "aaa"
 }
 
 resource "aws_iam_role_policy_attachment" "ssm" {
