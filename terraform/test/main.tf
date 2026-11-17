@@ -5,8 +5,8 @@ resource "aws_instance" "seob_vm" {
   ami = var.instance_ami
   instance_type = var.instance_type
   subnet_id = aws_subnet.seob_subnet.id
-  key_name = "what should I put here"
-  vpc_security_group_ids = [aws_security_group.<name>.id]
+  key_name = "Public key created for Ansible"
+  vpc_security_group_ids = [aws_security_group.seob_sg.id]
   associate_public_ip_address = true
 
   root_block_device {
@@ -24,18 +24,16 @@ resource "aws_instance" "seob_vm" {
 # S3 #
 #----#
 resource "aws_s3_bucket" "seob_s3" {
-  description = "For tfstate and DB"
-  bucket = "Seob_bucket"
+  bucket = "seob-bucket"
 }
 
 #-----#
 # VPC #
 #-----#
 resource "aws_vpc" "seob_vpc" {
-  description = "Network for my ec2"
   cidr_block = "10.10.0.0/16"
-  enable_dns_support = "true"
-  enable_dns_hostnames = "true"
+  enable_dns_support = true
+  enable_dns_hostnames = true
 }
 
 #--------#
@@ -44,6 +42,8 @@ resource "aws_vpc" "seob_vpc" {
 resource "aws_subnet" "seob_subnet" {
   vpc_id = aws_vpc.seob_vpc.id
   cidr_block = "10.10.10.0/24"
+  availability_zone = "eu-central-1a"
+  map_public_ip_on_launch = true
 }
 
 #------------------#
@@ -58,11 +58,6 @@ resource "aws_internet_gateway" "seob_gateway" {
 #-------------#
 resource "aws_route_table" "seob_route_table" {
   vpc_id = aws_vpc.seob_vpc.id
-
-  route {
-    cidr_block = "10.10.10.0/24"
-    gateway_id = aws_internet_gateway.seob_gateway.id
-  }
 }
 
 #-------#
@@ -70,7 +65,7 @@ resource "aws_route_table" "seob_route_table" {
 #-------#
 resource "aws_route" "seob_route" {
   route_table_id = aws_route_table.seob_route_table.id
-  destination_cidr_block = "10.10.10.0/24"
+  destination_cidr_block = "0.0.0.0/0"
   gateway_id = aws_internet_gateway.seob_gateway.id
 }
 
@@ -98,11 +93,15 @@ resource "aws_security_group" "seob_sg" {
   }
 }
 
+resource "aws_key_pair" "seob_key" {
+  key_name = "seob-key"
+  public_key = file("~/.ssh/")
+}
 
 #-----#
 # IAM #
 #-----#
-resource "iam_user" "users" {
+resource "aws_iam_user" "users" {
   count = length(var.aws_user)
   name = var.aws_user[count.index]
 }
