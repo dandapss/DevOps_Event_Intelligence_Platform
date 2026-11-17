@@ -1,7 +1,9 @@
+# Not necessary
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# created
 resource "aws_vpc" "main" {
   cidr_block = var.vpc_cidr
   enable_dns_support = true
@@ -12,6 +14,7 @@ resource "aws_vpc" "main" {
   }
 }
 
+# created
 resource "aws_subnet" "public" {
   vpc_id = aws_vpc.main.id
   cidr_block = var.public_subnet_cidr
@@ -23,6 +26,7 @@ resource "aws_subnet" "public" {
   }
 }
 
+# created
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -31,6 +35,7 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
+# created
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -44,10 +49,12 @@ resource "aws_route_table" "public" {
   }
 }
 
+# created
 resource "aws_route_table_association" "public" {
   subnet_id = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
+
 
 resource "aws_security_group" "ec2" {
   name = "${var.project_name}-${var.environment}-ec2"
@@ -66,6 +73,7 @@ resource "aws_security_group" "ec2" {
     Name = "${var.project_name}-${var.environment}-ec2"
   }
 }
+
 
 resource "aws_instance" "eip" {
   ami = var.instance_ami
@@ -110,6 +118,7 @@ resource "aws_ebs_volume" "postgres" {
   }
 }
 
+
 resource "aws_volume_attachmnet" "postgres" {
   device_name = "/dev/sdf"
   volume_id = aws_ebs_volume.postgres.id
@@ -118,6 +127,7 @@ resource "aws_volume_attachmnet" "postgres" {
   skip_destry = true
 }
 
+# created
 resource "aws_instance" "my_vm" {
   ami = var.instance_ami
   instance_type = var.instance_type
