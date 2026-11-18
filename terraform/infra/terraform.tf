@@ -1,10 +1,12 @@
+### Terraform ###
+
 terraform {
   required_version = ">= 1.10.0, < 2.0.0"
 
   backend "s3" {
     bucket = "seob-bucket"
     key = "terraform/terraform.tfstate"
-    region = "eu-central-1"
+    region = var.aws_region
     encrypt = true
     use_lockfile = true
   }
@@ -15,4 +17,8 @@ terraform {
       version = "~> 6.0"
     }
   }
+}
+
+provider "aws" {
+  region = var.aws_region
 }

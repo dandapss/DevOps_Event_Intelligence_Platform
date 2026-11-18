@@ -1,27 +1,8 @@
-variable "aws_user" {
-  type = list(string)
-  default = ["Seob"]
-}
-
-variable "instance_ami" {
-  description = "Ubuntui AMI ID for eu-central-1"
-  type = string
-  default = ["ami for linux vdi"]
-}
+### Variables ###
 
 variable "instance_type" {
   type = string
   default = "t3.micro"
-}
-
-variable "public_key_path" {
-  type = string
-  default = ".ssh/[path]"
-}
-
-variable "s3_bucket_name" {
-  type = string
-  default = "seob-bucket"
 }
 
 variable "aws_region" {
@@ -29,8 +10,6 @@ variable "aws_region" {
   type = string
   default = "eu-central-1"
 }
-
----
 
 variable "vpc_cidr" {
   description = "IP range for VPC"
