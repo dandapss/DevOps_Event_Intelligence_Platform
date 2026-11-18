@@ -1,78 +1,107 @@
-# Terraform and deployment status
+# Terraform Infrastructure
 
-Terraform is intended to create the AWS foundation for the Event Intelligence Platform. Ansible is intended to install k3s and bootstrap Argo CD. Argo CD will then deploy the Kubernetes applications from this repository.
+This document covers only the Terraform roots and AWS resources declared under `terraform/`. The diagrams show configuration intent; they do not mean the AWS resources have been applied or verified.
 
-## Responsibility split
+## Terraform layout
 
-| Path / component | Intended responsibility | Current state |
-|---|---|---|
-| `terraform/bootstrap` | Create the S3 bucket used for remote Terraform state and configure its protection | Draft; state persistence for the bootstrap run is unresolved |
-| `terraform/infra` | Create the VPC, subnet, internet route, security group, EC2, IAM instance profile, and PostgreSQL EBS volume | Draft; static configuration errors remain |
-| GitHub Actions | Validate, run Terraform, and pass EC2 details to Ansible | OIDC identity check succeeded, but the Terraform workflow wiring is incomplete |
-| Ansible | Connect to EC2, install k3s, then install Argo CD | Draft; host and access details are not connected |
-| Argo CD | Sync Kubernetes applications from Git | Manifests exist; AWS deployment is not verified |
+```mermaid
+flowchart TB
+  subgraph Bootstrap[Bootstrap root - terraform/bootstrap]
+    BTF[Terraform bootstrap configuration]
+    S3[ S3 bucket: seob-bucket ]
+    Versioning[Bucket versioning enabled]
+    Encryption[Default encryption: SSE-S3 / AES256]
+    PublicBlock[Block public access]
+    BState[(Bootstrap state object)]
+    BTF --> S3
+    S3 --> Versioning
+    S3 --> Encryption
+    S3 --> PublicBlock
+    S3 -. Stores .-> BState
+  end
 
-## Intended deployment flow
+  subgraph Infra[Infrastructure root - terraform/infra]
+    Variables[Region, CIDRs, AZ, instance type]
+    VPC[VPC 10.10.0.0/16]
+    Subnet[Public subnet 10.10.10.0/24]
+    IGW[Internet Gateway]
+    RT[Route table: 0.0.0.0/0 to IGW]
+    Association[Subnet route association]
+    SG[Security group: all outbound IPv4]
+    EC2["Ubuntu 24.04 EC2<br/>t3.micro default<br/>Public IPv4<br/>20 GiB encrypted gp3 root disk<br/>IMDSv2 required"]
+    Role[EC2 IAM role and instance profile]
+    SSM[AmazonSSMManagedInstanceCore]
+    CW[CloudWatchAgentServerPolicy]
+    EBS["2 GiB encrypted gp3 EBS<br/>attached as /dev/sdf"]
+    Outputs["Outputs: instance public IP<br/>instance ID<br/>PostgreSQL volume ID"]
+    CloudTrail[CloudTrail]
 
-1. Prepare the Terraform state bucket.
-2. Run `terraform/infra` with that bucket as its S3 backend and create AWS resources.
-3. Read the EC2 public IP, instance ID, and security group ID from Terraform outputs.
-4. Provide those values and the selected connection method to Ansible.
-5. Ansible installs k3s and bootstraps Argo CD on EC2.
-6. Argo CD pulls the Kubernetes manifests and deploys PostgreSQL, collectors, Prometheus, and Grafana.
+    Variables --> VPC
+    VPC --> Subnet
+    VPC --> IGW
+    VPC --> RT
+    RT --> Association
+    IGW --> RT
+    Subnet --> Association
+    Subnet --> EC2
+    SG --> EC2
+    Association --> EC2
+    Role --> EC2
+    Role --> SSM
+    Role --> CW
+    EC2 --> EBS
+    EC2 --> Outputs
+    EBS --> Outputs
+  end
 
-The OIDC identity test only confirms that GitHub Actions can assume the AWS role. It does not confirm that Terraform resources were applied, that Ansible can connect, or that workloads are running.
+  S3 -. Backend bucket configured in infra .-> InfraState[("Infra state key:<br/>terraform/terraform.tfstate")]
+  CloudTrail -. Current reference points to the bootstrap root resource .-> S3
 
-## Blocking items found in the current Terraform configuration
+  classDef root fill:#edf2ff,stroke:#4263a5,color:#172b4d
+  classDef storage fill:#e9f7ef,stroke:#31845b,color:#163c2b
+  classDef network fill:#e8f1ff,stroke:#356ac3,color:#172b4d
+  classDef compute fill:#fff3df,stroke:#c17a16,color:#50330d
+  classDef security fill:#f8eafa,stroke:#914c9c,color:#3b1d42
+  classDef output fill:#f1f3f5,stroke:#68717a,color:#20262b
+  class Bootstrap,Infra,BTF,Variables root
+  class S3,Versioning,Encryption,PublicBlock,BState,InfraState,EBS storage
+  class VPC,Subnet,IGW,RT,Association,SG network
+  class EC2 compute
+  class Role,SSM,CW,CloudTrail security
+  class Outputs output
+```
 
-### State bucket and bootstrap state
+## Declared resources
 
-`terraform/bootstrap/state.tf` creates `seob-bucket`, but `terraform/bootstrap/terraform.tf` has no remote backend. Terraform therefore keeps the bootstrap state in a local `terraform.tfstate` file. A GitHub-hosted runner is temporary, so that state disappears when its job ends. A later bootstrap run would not know that it already created the bucket.
+### `terraform/bootstrap`
 
-The bucket itself must exist before `terraform/infra` can run `terraform init` with it as a backend. The bootstrap sequence needs a durable state plan: for example, create the bucket once as a deliberate bootstrap step, then use it for the infrastructure state. Do not configure a Terraform root to create its own backend bucket during the same first `init`.
+- Creates the `seob-bucket` S3 bucket.
+- Enables bucket versioning, AES256 server-side encryption, and S3 Block Public Access.
+- Declares an S3 backend for bootstrap state.
 
-The bootstrap provider currently has `region = eu-central-1`; the region value needs to be a quoted string. The DynamoDB table resource is still active even though a nearby comment says it is disabled. The infrastructure backend uses S3 `use_lockfile`; the DynamoDB table is not connected to that backend.
+### `terraform/infra`
 
-### Infrastructure backend
+- Creates a VPC, one public subnet, an Internet Gateway, a default internet route, and a route-table association.
+- Creates an EC2 security group with unrestricted outbound IPv4 and no inbound rules declared in this Terraform configuration.
+- Creates an Ubuntu 24.04 EC2 instance with a public IPv4 address, a 20 GiB encrypted gp3 root disk, and IMDSv2 required.
+- Creates an EC2 role/profile with `AmazonSSMManagedInstanceCore` and `CloudWatchAgentServerPolicy` attached.
+- Creates an encrypted 2 GiB gp3 EBS volume and attaches it to EC2 as `/dev/sdf`.
+- Declares outputs for the instance public IP, instance ID, and EBS volume ID.
+- Declares a CloudTrail resource.
 
-`terraform/infra/terraform.tf` currently uses `region = var.aws_region` inside the backend block. Terraform backend settings cannot reference input variables, locals, or data sources. Use a literal region or provide the backend setting during `terraform init`. The S3 bucket must already exist when `init` runs. [Terraform backend configuration rules](https://developer.hashicorp.com/terraform/language/backend)
+## State layout
 
-### Resource references and HCL
+Both roots are configured to use `seob-bucket`, with different state keys intended to keep their state separate:
 
-The current `terraform/infra` files contain references that prevent a clean validation/apply:
+- `infra`: `terraform/terraform.tfstate`
+- `bootstrap`: the current `terraform/bootstrap/terraform.tf` contains two backend declarations with different keys. Resolve that duplicate before using the configuration.
 
-- `network.tf` refers to `aws_pvc.seob_vpc`; the resource declared above it is `aws_vpc.seob_vpc`.
-- `network.tf` has `tags { ... }` on the security group; Terraform map syntax requires `tags = { ... }`.
-- `iam.tf` spells the role trust policy principal key `indentifiers`; it must be `identifiers`.
-- `storage.tf` refers to `aws_instance.sebo_vm`; the EC2 resource is named `aws_instance.seob_vm`.
-- The route and route-table-association blocks have `tags` arguments that are not supported by those AWS provider resources. [Route resource](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) · [Route-table association](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association)
-- `compute.tf` and `iam.tf` use the S3 bucket resource `aws_s3_bucket.seob_s3`, but that resource is declared only in the separate `terraform/bootstrap` root. Terraform roots do not share resource references directly. CloudTrail also needs a bucket policy that permits log delivery; the current configuration does not define one.
+The S3 backend stores Terraform state; it does not create its own bucket. The bucket resource is declared in the bootstrap root.
 
-The AWS state bucket and CloudTrail log bucket should have distinct purposes. PostgreSQL files are intended for EBS, not S3. Attaching EBS to EC2 does not automatically make a Kubernetes PVC use it: the current PostgreSQL StorageClass uses `rancher.io/local-path`, so the EBS mount and Kubernetes storage configuration still need to be connected.
+## Current configuration limits
 
-### GitHub Actions workflow wiring
-
-The current workflow references also need alignment before deployment can be considered automated:
-
-- `CI.yaml` defines `terraform_boot` and `terraform_infra` outputs, while `terraform-validate` checks `needs.changes.outputs.terraform`, which is not defined.
-- `terraform-validate` runs in `terraform/`, but the actual configurations are separate roots in `terraform/bootstrap/` and `terraform/infra/`. Each root needs its own init/validate step.
-- `CI.yaml` calls `.github/workflows/terraform_bootstrap_cd.yaml`, while the repository file is named `terraform_boot_cd.yaml`.
-
-### EC2 to Ansible connection
-
-`terraform/infra/outputs.tf` currently exposes the EC2 public IP and instance ID, but the deployment flow does not pass them into the Ansible inventory. The security group ID is not an output, although `ansible_cd.yaml` expects it as a secret. `ansible/inventory.ini` still contains `<ec2 public ip>`.
-
-The connection method also needs one consistent choice:
-
-- **SSH:** the current Ansible workflow uses a private SSH key, but `compute.tf` does not configure an EC2 key pair. Terraform must register the matching public key and attach its key-pair name to the instance. The workflow then needs the private key and current host/security group details.
-- **SSM:** the EC2 role includes the SSM managed policy, but the Ansible inventory and workflow are currently written for SSH. To use SSM, configure the Ansible SSM connection/plugin and pass the instance ID; an SSH private key and inbound port 22 are not the SSM connection method.
-
-The EC2 instance profile is for AWS permissions used by the instance. It is separate from the GitHub Actions OIDC role used by Terraform.
-
-## Current assessment
-
-The repository has the intended infrastructure outline, but Terraform and Ansible are not yet ready to treat deployment as complete. Fix the state/bootstrap path, the listed Terraform references, CI validation and reusable-workflow paths, then connect Terraform outputs to the chosen Ansible access method. No AWS apply or Ansible deployment was performed during this review.
-
-Review the Terraform plan and expected AWS charges before applying. The EC2, EBS, public IP/networking, and CloudTrail resources can incur costs.
-
+- The bootstrap `.tf` files currently contain duplicated resource/backend blocks and `---` separator lines. As written, they need cleanup before Terraform can validate or run.
+- The CloudTrail configuration in `terraform/infra/compute.tf` refers to `aws_s3_bucket.seob_s3`, which is declared in a different Terraform root. Terraform roots do not share resource addresses directly. The current CloudTrail bucket reference is therefore not a valid cross-root connection.
+- Terraform only attaches the EBS volume. The current Terraform files do not format or mount it, nor connect it to a Kubernetes PVC.
+- The diagrams describe declared Terraform configuration only. No Terraform validation, plan, or AWS apply was run while updating this README.
 

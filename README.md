@@ -1,103 +1,87 @@
 # Event Intelligence Platform
 
-A personal DevOps project for collecting stock market data on a schedule and storing it in PostgreSQL. Stock prices are the primary scope; related news is a second collector. The project focuses on packaging, deploying, and operating scheduled workloads. It does not provide investment advice or place trades.
+A personal DevOps project for collecting stock prices and related news on a schedule, storing the results in PostgreSQL, and operating the workloads on Kubernetes. Stock data is the main scope; this project does not provide investment advice or place trades.
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-  Dev[Developer]
+  Dev[Developer] --> Repo
 
-  subgraph GitHub["GitHub"]
-    Repo[Repository]
-    subgraph Actions["GitHub Actions"]
-      CI[Validation and image workflow]
-      TF[Terraform workflow - in progress]
-    end
-    subgraph Registry["GHCR"]
-      StockImage[Stock collector image]
-      NewsImage[News collector image]
-    end
-    Repo --> CI
-    CI -->|Build and publish changed images| StockImage
-    CI -->|Build and publish changed images| NewsImage
-    CI -.-> TF
+  subgraph GitHub[GitHub]
+    Repo[Project repository]
+    Actions[GitHub Actions]
+    GHCR[GHCR container images]
+    Repo --> Actions
+    Actions -->|Build and publish changed collectors| GHCR
   end
 
-  Dev --> Repo
-  TF -.->|Planned infrastructure| VPC
-  Repo -.->|GitOps sync| ArgoLocal
-  Repo -.->|GitOps sync| ArgoProd
-
-  subgraph Local["Development - local kind"]
+  subgraph Local[Local development - kind]
     ArgoLocal[Argo CD]
-    subgraph LocalK8s["Kubernetes workloads"]
-      LStock[Stock CronJob]
-      LNews[News CronJob]
-      LPostgres[PostgreSQL]
+    subgraph LocalCluster[Kubernetes workloads]
+      LStock[Stock collector CronJob]
+      LNews[News collector CronJob]
+      LDB[PostgreSQL]
       LProm[Prometheus]
-      LGrafana[Grafana]
+      LGraf[Grafana]
     end
-    ArgoLocal --> LocalK8s
-    LStock --> LPostgres
-    LNews --> LPostgres
-    LocalK8s -.-> LProm
-    LProm -.-> LGrafana
+    ArgoLocal --> LocalCluster
+    LStock --> LDB
+    LNews --> LDB
   end
 
-  subgraph AWS["Production target - AWS"]
-    VPC[VPC and subnet] --> EC2[EC2 Linux host]
-    EC2 --> K3s[k3s]
-    K3s --> ArgoProd[Argo CD]
-    ArgoProd --> ProdK8s
-    subgraph ProdK8s["k3s workloads"]
-      PStock[Stock CronJob]
-      PNews[News CronJob]
-      PPostgres[PostgreSQL]
-      PProm[Prometheus]
-      PGrafana[Grafana]
-    end
-    PStock --> PPostgres
-    PNews --> PPostgres
-    ProdK8s -.-> PProm
-    PProm -.-> PGrafana
-    EBS[Dedicated 2 GiB EBS volume] -.-> PPostgres
-  end
-
-  StockImage --> LStock
-  NewsImage --> LNews
-  StockImage -.-> PStock
-  NewsImage -.-> PNews
-  StockAPI[External stock data provider] --> LStock
-  StockAPI --> PStock
+  Repo -. GitOps manifests .-> ArgoLocal
+  GHCR -->|Image pull| LStock
+  GHCR -->|Image pull| LNews
+  StockAPI[Stock data provider] --> LStock
   NewsRSS[Yahoo Finance RSS] --> LNews
-  NewsRSS --> PNews
-  PGrafana -.-> Discord[Discord alerts - planned]
+
+  subgraph AWS[AWS production target - not yet verified]
+    TF[Terraform configuration]
+    VPC[VPC and public subnet]
+    EC2[EC2 Linux host]
+    K3s[k3s cluster]
+    ArgoAWS[Argo CD]
+    subgraph AWSCluster[Kubernetes workloads]
+      PStock[Stock collector CronJob]
+      PNews[News collector CronJob]
+      PDB[PostgreSQL]
+      PProm[Prometheus]
+      PGraf[Grafana]
+    end
+    TF --> VPC --> EC2 --> K3s --> ArgoAWS --> AWSCluster
+    PStock --> PDB
+    PNews --> PDB
+  end
+
+  GHCR -. Future image pull .-> PStock
+  GHCR -. Future image pull .-> PNews
+  StockAPI -.-> PStock
+  NewsRSS -.-> PNews
+
+  classDef source fill:#e8f1ff,stroke:#356ac3,color:#172b4d
+  classDef github fill:#f0eaff,stroke:#7048a8,color:#2d1b45
+  classDef local fill:#e8f7ef,stroke:#31845b,color:#163c2b
+  classDef target fill:#fff3df,stroke:#c17a16,color:#50330d
+  class Dev,StockAPI,NewsRSS source
+  class Repo,Actions,GHCR github
+  class ArgoLocal,LocalCluster,LStock,LNews,LDB,LProm,LGraf local
+  class TF,VPC,EC2,K3s,ArgoAWS,AWSCluster,PStock,PNews,PDB,PProm,PGraf target
 ```
 
-Each environment has its own Argo CD: local Argo CD manages development workloads in kind; the planned AWS Argo CD will manage production workloads in k3s.
+The AWS box shows the declared production target, not a completed deployment. Dashed arrows mark target or external connections.
 
-## Current status
+## Project status
 
-- Stock and news collector code, Dockerfiles, PostgreSQL schema, CronJob manifests, and Helm application definitions are present.
-- The Argo CD root and child Application manifests point to this repository.
-- GitHub Actions contains path-based validation and image build/publish workflows. The manual OIDC identity check succeeded; it did not provision AWS resources.
-- Terraform is now split into `terraform/bootstrap` and `terraform/infra`. The configurations and their GitHub workflow connection still need fixes before a reliable AWS deployment.
-- Ansible is intended to install k3s and bootstrap Argo CD. The EC2 address and access method (SSH key or SSM) are not yet wired through the workflow.
-- The PostgreSQL chart uses a local-path StorageClass. Connecting its data to the planned EC2 EBS volume remains unfinished.
-- Custom Grafana dashboards and Discord alert rules are not yet in the repository.
-
-The repository describes the intended local kind and AWS EC2/k3s environments. It does not yet provide evidence that the end-to-end deployment has completed. See the [Terraform and deployment notes](terraform/README.md) for the current blockers.
-
-## DevOps focus
-
-The project applies CI, container image delivery, GitOps, infrastructure as code, persistent storage, and monitoring to scheduled data collection. The Python collectors are intentionally small so the focus stays on delivering and operating the platform.
+- The repository contains Python stock and news collectors, container build definitions, Kubernetes manifests, and Helm configuration for PostgreSQL and monitoring components.
+- GitHub Actions is configured for path-based validation and collector image publishing to GHCR.
+- Local kind is the development target. AWS EC2/k3s is described as a target, not a completed deployment.
+- The Terraform files are still being prepared. See [Terraform notes](terraform/README.md) for the resources and current configuration limits.
+- Grafana dashboard and alert work is not presented here as complete.
 
 ## Storage and cost
 
-The production target is a dedicated 2 GiB EBS volume for PostgreSQL. The Terraform state bucket is a separate purpose: it stores Terraform's state file. The Kubernetes PVC, EBS volume, and S3 state bucket are not interchangeable.
-
-AWS resources such as EC2, EBS, public networking, and CloudTrail may incur charges. Review the plan and expected cost before applying it.
+The Terraform configuration declares an encrypted 2 GiB EBS volume for PostgreSQL. The S3 bucket is for Terraform state and serves a separate purpose. Review the Terraform plan and AWS charges before applying resources.
 
 ## Project notes
 
@@ -105,4 +89,5 @@ AWS resources such as EC2, EBS, public networking, and CloudTrail may incur char
 - [MVP specification](docs/MVP_SPEC.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [AWS setup checklist](docs/AWS_CONNECTIONS.md)
-- [Terraform and deployment notes](terraform/README.md)
+- [Terraform notes](terraform/README.md)
+
