@@ -235,9 +235,14 @@ jobs:
       - terraform-boot-cd
 
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.terraform_infra == 'true' &&
-      needs.terraform-validate.result == 'success'
+      needs.terraform-validate.result == 'success' &&
+      (
+        needs.terraform-boot-cd.result == 'success' ||
+        needs.terraform-boot-cd.result == 'skipped'
+      )
 
     uses: ./.github/workflows/terraform_infra_cd.yaml
 
