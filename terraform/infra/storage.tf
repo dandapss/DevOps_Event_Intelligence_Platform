@@ -17,6 +17,6 @@ resource "aws_ebs_volume" "seob_ebs" {
 resource "aws_volume_attachment" "seob_ebs_attachment" {
   device_name = "/dev/sdf"
   volume_id = aws_ebs_volume.seob_ebs.id
-  instance_id = aws_instance.sebo_vm.id
+  instance_id = aws_instance.seob_vm.id
   skip_destroy = true
 }

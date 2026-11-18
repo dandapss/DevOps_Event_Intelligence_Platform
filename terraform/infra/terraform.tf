@@ -6,7 +6,7 @@ terraform {
   backend "s3" {
     bucket = "seob-bucket"
     key = "terraform/terraform.tfstate"
-    region = var.aws_region
+    region = "eu-central-1"
     encrypt = true
     use_lockfile = true
   }

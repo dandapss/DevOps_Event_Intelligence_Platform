@@ -42,7 +42,7 @@ resource "aws_internet_gateway" "seob_gateway" {
 # Route Table #
 #-------------#
 resource "aws_route_table" "seob_route_table" {
-  vpc_id = aws_pvc.seob_vpc.id
+  vpc_id = aws_vpc.seob_vpc.id
 
   tags = {
     Name = "seob-route-table"
@@ -56,10 +56,6 @@ resource "aws_route" "seob_route" {
   route_table_id = aws_route_table.seob_route_table.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id = aws_internet_gateway.seob_gateway.id
-
-  tags = {
-    Name = "seob-route"
-  }
 }
 
 #-------------------#
@@ -68,10 +64,6 @@ resource "aws_route" "seob_route" {
 resource "aws_route_table_association" "seob_r_associate" {
   subnet_id = aws_subnet.seob_subnet.id
   route_table_id = aws_route_table.seob_route_table.id
-
-  tags = {
-    Name = "seob-route-associate"
-  }
 }
 
 #----------------#
@@ -89,7 +81,7 @@ resource "aws_security_group" "seob_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags {
+  tags = {
     Name = "seob-sg"
   }
 }

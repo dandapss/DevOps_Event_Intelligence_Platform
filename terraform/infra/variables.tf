@@ -24,7 +24,7 @@ variable "subnet_cidr" {
 }
 
 variable "availability_zone" {
-  descriptiuon = "Availability zone for EC2 and EBS"
+  description = "Availability zone for EC2 and EBS"
   type = string
   default = "eu-central-1a"
 }

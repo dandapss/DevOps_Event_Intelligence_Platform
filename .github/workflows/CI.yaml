@@ -101,7 +101,9 @@ jobs:
 
   terraform-validate:
     needs: changes
-    if: needs.changes.outputs.terraform == 'true'
+    if: |
+      needs.changes.outputs.terraform_boot == 'true' ||
+      needs.changes.outputs.terraform_infra == 'true'
 
     runs-on: ubuntu-latest
 
