@@ -1,4 +1,4 @@
-name: Terraform CD
+name: Terraform boot CD
 
 on:
   workflow_call:
@@ -17,7 +17,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform
+        working-directory: terraform/bootstrap
 
     steps:
       - uses: actions/checkout@v4
@@ -37,12 +37,3 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply --auto-approve
-
-  ansible-cd:
-    needs: terraform-apply
-
-    if: |
-      github.ref == 'refs/heads/main' &&
-      needs.terraform-apply.result == 'success'
-
-    uses: ./.github/workflows/ansible_cd.yaml

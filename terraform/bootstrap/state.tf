@@ -26,6 +26,8 @@ resource "aws_s3_bucket_public_access_block" "seob_s3_public_block" {
   restrict_public_buckets = true
 }
 
+# Using newer way [use_lockfile = true]
+# Disabled
 resource "aws_dynamodb_table" "terraform_lock" {
   name = "terraform-lock"
 

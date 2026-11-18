@@ -28,7 +28,8 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      terraform: ${{ steps.filter.outputs.terraform }}
+      terraform_boot: ${{ steps.filter.outputs.terraform_boot }}
+      terraform_infra: ${{ steps.filter.outputs.terraform_infra }}
       ansible: ${{ steps.filter.outputs.ansible }}
       kubernetes: ${{ steps.filter.outputs.kubernetes }}
       images: ${{ steps.targets.outputs.images }}
@@ -44,8 +45,11 @@ jobs:
         with:
           list-files: json
           filters: |
-            terraform:
-              - 'terraform/**'
+            terraform_boot:
+              - 'terraform/bootstrap/**'
+
+            terraform_infra:
+              - 'terraform/infra/**'
 
             ansible:
               - 'ansible/**'
@@ -212,17 +216,30 @@ jobs:
  # Terraform CD Start #
  #--------------------#
 
-  terraform-cd:
+  terraform-boot-cd:
     needs:
       - changes
       - terraform-validate
 
     if: |
       github.ref == 'refs/heads/main' &&
-      needs.changes.outputs.terraform == 'true' &&
+      needs.changes.outputs.terraform_boot == 'true' &&
       needs.terraform-validate.result == 'success'
 
-    uses: ./.github/workflows/terraform_cd.yaml
+    uses: ./.github/workflows/terraform_bootstrap_cd.yaml
+
+  terraform-infra-cd:
+    needs:
+      - changes
+      - terraform-validate
+      - terraform-boot-cd
+
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.terraform_infra == 'true' &&
+      needs.terraform-validate.result == 'success'
+
+    uses: ./.github/workflows/terraform_infra_cd.yaml
 
  #------------------#
  # Terraform CD End #

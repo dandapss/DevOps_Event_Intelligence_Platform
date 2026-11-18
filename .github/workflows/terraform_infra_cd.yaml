@@ -1,0 +1,48 @@
+name: Terraform infra CD
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  # Get OIDC Token
+  #id-token: write
+
+concurrency:
+  group: terraform
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform/infra
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::236608206962:role/eip-github-actions-terraform
+          aws-region: eu-central-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan
+
+      - name: Terraform Apply
+        run: terraform apply --auto-approve
+
+  ansible-cd:
+    needs: terraform-apply
+
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.terraform-apply.result == 'success'
+
+    uses: ./.github/workflows/ansible_cd.yaml
