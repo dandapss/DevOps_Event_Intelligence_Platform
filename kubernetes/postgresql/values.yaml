@@ -10,6 +10,7 @@ postgresql:
     repository: bitnami/postgresql
     tag: latest
 
+  # Creating VPC for my PostgreSQL
   primary:
     persistence:
       enabled: true

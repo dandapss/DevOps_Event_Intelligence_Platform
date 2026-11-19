@@ -1,5 +1,3 @@
-# ChatGPT Codex
-
 name: Terraform bootstrap initial setup
 
 on:
@@ -28,9 +26,15 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
 
+      - name: Terraform format check
+        run: terraform fmt -check -recursive terraform/backend
+
       # Terraform init without backend connection
       - name: Initialize with temporary local state
         run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        run: terraform validate
 
       - name: Plan bucket creation
         run: terraform plan -input=false -out=bootstrap.tfplan

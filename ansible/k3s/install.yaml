@@ -18,7 +18,7 @@ tasks:
     shell: |
       curl -sfL https://get.k3s.io | sh -
     args:
-      creates: /usr/local/bin/k3s
+      creates: /etc/rancher/k3s/k3s.yaml
 
   - name: Start and Enable k3s service
     systemd:
@@ -33,6 +33,7 @@ tasks:
     delay: 5
     until: "'Ready' in node_status.stdout"
 
+  # Install Helm for next steps
   - name: Install Helm
     shell: |
       curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -40,7 +41,7 @@ tasks:
       creates: /usr/local/bin/helm
 
   - name: Verify Helm
-    shell: helm version
+    command: helm version
 
   - name: Show node status
     debug:

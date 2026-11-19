@@ -136,12 +136,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: pip install ansible ansible-lint
+      - name: Install Ansible
+        run: pip install ansible ansible-lint
 
-      - run: ansible-lint
-
-      - run: |
-          find ansible -name "*.yml" -o -name "*.yaml"
+      - name: Ansible Lint
+        run: ansible-lint ansible/site.yaml
 
   kubernetes-validate:
     needs: changes
