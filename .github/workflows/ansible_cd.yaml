@@ -13,7 +13,7 @@ concurrency:
   group: ansible
 
 jobs:
-  terraform-apply:
+  ansible-run:
     runs-on: ubuntu-latest
 
     defaults:
@@ -37,6 +37,7 @@ jobs:
       - name: Get Terraform Outputs
         working-directory: terraform/infra
         run: |
+          terraform init
           echo "INSTANCE_ID=$(terraform output -raw instance_id)" >> $GITHUB_ENV
 
       - name: Generate Inventory

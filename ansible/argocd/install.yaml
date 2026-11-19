@@ -13,7 +13,7 @@ tasks:
     shell: |
       helm upgrade --install argocd argo/argo-cd \
         --namespace argocd \
-        --create-namespace\
+        --create-namespace \
         -f {{ playbook_dir }}/values.yaml
 
   - name: Wait for ArgoCD Server

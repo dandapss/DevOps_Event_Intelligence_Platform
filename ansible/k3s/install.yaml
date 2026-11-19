@@ -1,8 +1,8 @@
 name: Install k3s
-hosts: e2c
+hosts: k3s
 become: true
 
-taks:
+tasks:
   - name: Update apt cache
     apt:
       update_cache: true
@@ -32,6 +32,15 @@ taks:
     retries: 30
     delay: 5
     until: "'Ready' in node_status.stdout"
+
+  - name: Install Helm
+    shell: |
+      curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    args:
+      creates: /usr/local/bin/helm
+
+  - name: Verify Helm
+    shell: helm version
 
   - name: Show node status
     debug:
