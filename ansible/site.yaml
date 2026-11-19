@@ -2,4 +2,6 @@
 
 - import_playbook: k3s/install.yaml
 
+- import_playbook: secret/postgresql-secret.yaml
+
 - import_playbook: argocd/install.yaml

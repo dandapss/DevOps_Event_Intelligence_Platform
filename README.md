@@ -17,62 +17,52 @@ The design separates the responsibilities:
 ## Architecture
 
 ~~~mermaid
-flowchart LR
-  Developer[Developer] --> GitHubRepo
+flowchart TB
+  Developer[Developer] --> Repo[Git repository]
 
-  subgraph GitHub["GitHub"]
-    GitHubRepo[Git repository]
-    Actions[GitHub Actions]
-    GHCR[GHCR]
-    GitHubRepo --> Actions
-    Actions -->|Build and publish changed collector image| GHCR
-    Actions -->|Commit immutable image tag| GitHubRepo
+  subgraph Delivery[GitHub delivery]
+    direction TB
+    Repo --> Actions[GitHub Actions]
+    Actions -->|Build changed collector| GHCR[GHCR image]
+    Actions -->|Commit SHA image tag| Repo
   end
 
-  subgraph AWS["AWS and Kubernetes deployment design"]
-    Terraform[Terraform]
-    VPC[VPC and public subnet]
-    EC2[Ubuntu EC2]
-    HostSetup[Ansible]
-    K3s[K3s]
-    ArgoCD[Argo CD]
-    EBSCSI[EBS CSI driver]
-    StorageClass[Encrypted gp3 StorageClass]
-    PostgreSQL[PostgreSQL]
-    PVC[PostgreSQL PVC]
-    EBS[(EBS volume)]
-    StockJob[Stock CronJob]
-    NewsJob[News CronJob]
-    Prometheus[Prometheus]
-    Grafana[Grafana]
+  Repo -. GitOps manifests .-> ArgoCD[Argo CD]
+  Terraform[Terraform] --> VPC[VPC and public subnet]
+  VPC --> EC2[Ubuntu EC2]
+  Ansible[Ansible] --> K3s[K3s]
+  EC2 --> K3s
+  K3s --> ArgoCD
 
-    Terraform --> VPC --> EC2
-    Terraform -->|EC2 role and instance profile| EC2
-    HostSetup -->|K3s and Argo CD setup| EC2
-    EC2 --> K3s --> ArgoCD
-    ArgoCD -->|Syncs Kubernetes resources from Git| K3s
-    ArgoCD --> EBSCSI
-    ArgoCD --> StorageClass
-    ArgoCD --> PostgreSQL
-    PostgreSQL --> PVC --> StorageClass
-    EBSCSI -->|Creates, attaches and mounts| EBS
+  subgraph Cluster[Kubernetes on EC2]
+    direction TB
+    ArgoCD --> Stock[Stock CronJob]
+    ArgoCD --> News[News CronJob]
+    ArgoCD --> PostgreSQL[PostgreSQL]
+    ArgoCD --> EBSCSI[EBS CSI driver]
+    ArgoCD --> Monitoring[Prometheus and Grafana]
+    Stock --> PostgreSQL
+    News --> PostgreSQL
+    PostgreSQL --> PVC[2 Gi PVC]
+    PVC --> SC[Encrypted gp3 StorageClass]
+    EBSCSI -->|Creates and mounts| EBS[(EBS volume)]
     EBS --> PostgreSQL
-    ArgoCD --> StockJob
-    ArgoCD --> NewsJob
-    ArgoCD --> Prometheus
-    ArgoCD --> Grafana
-    GHCR -->|Image pull| StockJob
-    GHCR -->|Image pull| NewsJob
   end
 
-  GitHubRepo -.->|GitOps manifests| ArgoCD
-  StockAPI[Stock data provider] --> StockJob
-  YahooRSS[Yahoo Finance RSS] --> NewsJob
-  StockJob --> PostgreSQL
-  NewsJob --> PostgreSQL
+  GHCR -->|Image pull| Stock
+  GHCR -->|Image pull| News
+  StockSource[Stock data provider] --> Stock
+  NewsSource[Yahoo Finance RSS] --> News
+  Terraform -. State keys .-> S3[(S3 state bucket)]
 
-  S3[(S3 Terraform state bucket)]
-  Terraform -.->|backend and infrastructure state keys| S3
+  classDef github fill:#f0eaff,stroke:#7048a8,color:#2d1b45
+  classDef cloud fill:#e8f1ff,stroke:#356ac3,color:#172b4d
+  classDef workload fill:#e8f7ef,stroke:#31845b,color:#163c2b
+  classDef storage fill:#fff3df,stroke:#c17a16,color:#50330d
+  class Repo,Actions,GHCR github
+  class Terraform,VPC,EC2,Ansible,K3s,ArgoCD cloud
+  class Stock,News,PostgreSQL,Monitoring workload
+  class PVC,SC,EBSCSI,EBS,S3 storage
 ~~~
 
 ## Design decisions

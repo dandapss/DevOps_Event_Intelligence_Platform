@@ -15,6 +15,7 @@ concurrency:
 jobs:
   ansible-run:
     runs-on: ubuntu-latest
+    environment: production
 
     defaults:
       run:

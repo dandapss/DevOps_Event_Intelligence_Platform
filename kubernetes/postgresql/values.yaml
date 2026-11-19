@@ -1,14 +1,16 @@
 postgresql:
   auth:
-    postgresPassword: postgres
     username: db_user
-    password: db_password
     database: event_intelligence
+    existingSecret: eip-postgresql-auth
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
 
   image:
     registry: docker.io
     repository: bitnami/postgresql
-    tag: latest
+    tag: 17.6.0-debian-12-r4
 
   # Creating VPC for my PostgreSQL
   primary:
