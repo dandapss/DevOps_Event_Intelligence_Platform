@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      terraform_boot: ${{ steps.filter.outputs.terraform_boot }}
+      terraform_backend: ${{ steps.filter.outputs.terraform_backend }}
       terraform_infra: ${{ steps.filter.outputs.terraform_infra }}
       ansible: ${{ steps.filter.outputs.ansible }}
       kubernetes: ${{ steps.filter.outputs.kubernetes }}
@@ -45,8 +45,8 @@ jobs:
         with:
           list-files: json
           filters: |
-            terraform_boot:
-              - 'terraform/bootstrap/**'
+            terraform_backend:
+              - 'terraform/backend/**'
 
             terraform_infra:
               - 'terraform/infra/**'
@@ -102,28 +102,30 @@ jobs:
   terraform-validate:
     needs: changes
     if: |
-      needs.changes.outputs.terraform_boot == 'true' ||
+      needs.changes.outputs.terraform_backend == 'true' ||
       needs.changes.outputs.terraform_infra == 'true'
 
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: terraform
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
 
-      - run: terraform fmt -check -recursive
+      - run: terraform fmt -check -recursive terraform
         name: Terraform format check
 
-      - run: terraform init -backend=false
-        name: Terraform init check
+      - name: validate backend
+        if: needs.changes.outputs.terraform_backend == 'true'
+        run: |
+          terraform -chdir=terraform/backend init -backend=false input=false
+          terraform -chdir=terraform/backend validate
 
-      - run: terraform validate
-        name: Terraform validate
+      - name: validate infra
+        if: needs.changes.outputs.terraform_infra == 'true'
+        run: |
+          terraform -chdir=terraform/infra init -backend=false -input=false
+          terraform -chdir=terraform/infra validate
 
   ansible-validate:
     needs: changes
@@ -218,17 +220,17 @@ jobs:
  # Terraform CD Start #
  #--------------------#
 
-  terraform-boot-cd:
+  terraform-backend-cd:
     needs:
       - changes
       - terraform-validate
 
     if: |
       github.ref == 'refs/heads/main' &&
-      needs.changes.outputs.terraform_boot == 'true' &&
+      needs.changes.outputs.terraform_backend == 'true' &&
       needs.terraform-validate.result == 'success'
 
-    uses: ./.github/workflows/terraform_bootstrap_cd.yaml
+    uses: ./.github/workflows/terraform_backend_cd.yaml
 
   terraform-infra-cd:
     needs:
@@ -242,8 +244,8 @@ jobs:
       needs.changes.outputs.terraform_infra == 'true' &&
       needs.terraform-validate.result == 'success' &&
       (
-        needs.terraform-boot-cd.result == 'success' ||
-        needs.terraform-boot-cd.result == 'skipped'
+        needs.terraform-backend-cd.result == 'success' ||
+        needs.terraform-backend-cd.result == 'skipped'
       )
 
     uses: ./.github/workflows/terraform_infra_cd.yaml

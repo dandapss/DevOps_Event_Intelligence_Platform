@@ -15,7 +15,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform/bootstrap
+        working-directory: terraform/backend
 
     steps:
       - uses: actions/checkout@v4
@@ -28,27 +28,23 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
 
-      # 아직 S3 버킷이 없으므로 첫 init은 backend 접속을 건너뜁니다.
+      # Terraform init without backend connection
       - name: Initialize with temporary local state
         run: terraform init -backend=false -input=false
 
       - name: Plan bucket creation
         run: terraform plan -input=false -out=bootstrap.tfplan
 
-      # 버킷을 만들고, 생성 정보를 임시 로컬 state에 기록합니다.
       - name: Create the state bucket
         run: terraform apply -input=false -auto-approve bootstrap.tfplan
 
-      # 최초 versioning 설정 직후 state 객체를 쓰기 전 AWS 권고 대기 시간입니다.
       - name: Wait for S3 versioning
-        run: sleep 900
+        run: sleep 30
 
-      # 로컬 state를 terraform/bootstrap.tfstate로 이전합니다.
       - name: Migrate bootstrap state to S3
         run: terraform init -input=false -migrate-state -force-copy
 
       - name: Verify remote state and configuration
         run: |
           terraform state list
-          terraform plan -input=false -out=bootstrap-remote.tfplan
-          terraform apply -input=false -auto-approve bootstrap-remote.tfplan
+          terraform plan -input=false
