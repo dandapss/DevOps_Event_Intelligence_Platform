@@ -118,7 +118,7 @@ jobs:
       - name: validate backend
         if: needs.changes.outputs.terraform_backend == 'true'
         run: |
-          terraform -chdir=terraform/backend init -backend=false input=false
+          terraform -chdir=terraform/backend init -backend=false -input=false
           terraform -chdir=terraform/backend validate
 
       - name: validate infra
@@ -186,6 +186,7 @@ jobs:
 
       - name: Kustomize build test
         run: |
+          kustomize build kubernetes > /dev/null
           kustomize build kubernetes/apps/news-collector > /dev/null
           kustomize build kubernetes/apps/stock-collector > /dev/null
 
@@ -235,7 +236,7 @@ jobs:
     needs:
       - changes
       - terraform-validate
-      - terraform-boot-cd
+      - terraform-backend-cd
 
     if: |
       always() &&

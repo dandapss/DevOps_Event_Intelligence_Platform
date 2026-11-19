@@ -1,48 +1,48 @@
-name: Install k3s
-hosts: k3s
-become: true
+- name: Install k3s
+  hosts: k3s
+  become: true
 
-tasks:
-  - name: Update apt cache
-    apt:
-      update_cache: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
 
-  - name: Install required packages
-    apt:
-      name:
-        - curl
-      state: present
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+        state: present
 
-  # s: silent, f: detect failure, L: follow redirection
-  - name: Install k3s
-    shell: |
-      curl -sfL https://get.k3s.io | sh -
-    args:
-      creates: /etc/rancher/k3s/k3s.yaml
+    # s: silent, f: detect failure, L: follow redirection
+    - name: Install k3s
+      shell: |
+        curl -sfL https://get.k3s.io | sh -
+      args:
+        creates: /etc/rancher/k3s/k3s.yaml
 
-  - name: Start and Enable k3s service
-    systemd:
-      name: k3s
-      state: started
-      enabled: true
+    - name: Start and Enable k3s service
+      systemd:
+        name: k3s
+        state: started
+        enabled: true
 
-  - name: Wait for node ready
-    shell: kubectl get nodes --no-headers
-    register: node_status
-    retries: 30
-    delay: 5
-    until: "'Ready' in node_status.stdout"
+    - name: Wait for node ready
+      shell: kubectl get nodes --no-headers
+      register: node_status
+      retries: 30
+      delay: 5
+      until: "'Ready' in node_status.stdout"
 
-  # Install Helm for next steps
-  - name: Install Helm
-    shell: |
-      curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-    args:
-      creates: /usr/local/bin/helm
+    # Install Helm for next steps
+    - name: Install Helm
+      shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
 
-  - name: Verify Helm
-    command: helm version
+    - name: Verify Helm
+      command: helm version
 
-  - name: Show node status
-    debug:
-      var: node_status.stdout_lines
+    - name: Show node status
+      debug:
+        var: node_status.stdout_lines

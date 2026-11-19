@@ -27,7 +27,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform format check
-        run: terraform fmt -check -recursive terraform/backend
+        run: terraform fmt -check -recursive .
 
       # Terraform init without backend connection
       - name: Initialize with temporary local state

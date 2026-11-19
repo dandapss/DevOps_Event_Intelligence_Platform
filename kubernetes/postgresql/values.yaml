@@ -15,7 +15,7 @@ postgresql:
     persistence:
       enabled: true
       size: 2Gi
-      storageClass: postgres-storage
+      storageClass: ebs-gp3
 
     extraVolumes:
       - name: schema

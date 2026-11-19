@@ -40,3 +40,8 @@ resource "aws_iam_role_policy_attachment" "cloudwatch" {
   role = aws_iam_role.seob_role.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
+
+resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  role = aws_iam_role.seob_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}

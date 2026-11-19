@@ -53,3 +53,4 @@ resource "aws_cloudtrail" "seob_cloudtrail" {
 
   depends_on = [aws_s3_bucket.seob_s3]
 }
+# Create separate bucket for cloudtrail

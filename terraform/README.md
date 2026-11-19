@@ -1,107 +1,108 @@
-# Terraform Infrastructure
+# Terraform and AWS
 
-This document covers only the Terraform roots and AWS resources declared under `terraform/`. The diagrams show configuration intent; they do not mean the AWS resources have been applied or verified.
+This directory defines the AWS foundation for the Event Intelligence Platform. Terraform owns AWS infrastructure and its state. Ansible prepares the EC2 host; Argo CD manages Kubernetes resources after it is installed.
 
-## Terraform layout
+## Two Terraform roots
 
-```mermaid
+terraform/backend and terraform/infra are independent Terraform root modules. Each directory has its own provider/backend configuration and its own state key. They share an S3 bucket, but they do not share Terraform resource addresses.
+
+| Root | Purpose | State key |
+|---|---|---|
+| terraform/backend | Creates and protects the Terraform state bucket | backend.tfstate |
+| terraform/infra | Describes the network, EC2 host, IAM, and CloudTrail | infra.tfstate |
+
+The bucket has versioning, AES-256 server-side encryption, and S3 Block Public Access enabled. The S3 bucket stores Terraform state; it is separate from the EBS volume used for PostgreSQL data.
+
+A Terraform resource address such as aws_s3_bucket.seob_s3 is visible only inside the root where it is declared. The fact that both roots use the same S3 backend does not make the bucket resource address available to terraform/infra. Roots share values through explicit interfaces such as input variables, data sources, or remote-state outputs; the shared backend bucket does not merge their resource graphs.
+
+## State bootstrap flow
+
+The bucket must exist before a root can use it as its backend. The one-time bootstrap workflow therefore:
+
+1. Initializes terraform/backend with -backend=false, using temporary local state.
+2. Creates the S3 bucket and its protection settings.
+3. Reinitializes with state migration so the bootstrap state is stored in backend.tfstate.
+
+Later backend changes use the normal remote-state workflow. The infrastructure root uses the same bucket with the separate key infra.tfstate.
+
+## AWS infrastructure design
+
+~~~mermaid
 flowchart TB
-  subgraph Bootstrap[Bootstrap root - terraform/bootstrap]
-    BTF[Terraform bootstrap configuration]
-    S3[ S3 bucket: seob-bucket ]
-    Versioning[Bucket versioning enabled]
-    Encryption[Default encryption: SSE-S3 / AES256]
-    PublicBlock[Block public access]
-    BState[(Bootstrap state object)]
-    BTF --> S3
-    S3 --> Versioning
-    S3 --> Encryption
-    S3 --> PublicBlock
-    S3 -. Stores .-> BState
+  subgraph State["Terraform state"]
+    BackendRoot["terraform/backend root"]
+    StateBucket["S3 state bucket<br/>versioning, encryption, public access block"]
+    BackendState[("backend.tfstate")]
+    InfraState[("infra.tfstate")]
+    BackendRoot -->|Creates| StateBucket
+    StateBucket --> BackendState
+    StateBucket --> InfraState
   end
 
-  subgraph Infra[Infrastructure root - terraform/infra]
-    Variables[Region, CIDRs, AZ, instance type]
-    VPC[VPC 10.10.0.0/16]
-    Subnet[Public subnet 10.10.10.0/24]
+  subgraph Infra["terraform/infra root"]
+    VPC[VPC]
+    Subnet[Public subnet]
     IGW[Internet Gateway]
-    RT[Route table: 0.0.0.0/0 to IGW]
-    Association[Subnet route association]
-    SG[Security group: all outbound IPv4]
-    EC2["Ubuntu 24.04 EC2<br/>t3.micro default<br/>Public IPv4<br/>20 GiB encrypted gp3 root disk<br/>IMDSv2 required"]
-    Role[EC2 IAM role and instance profile]
-    SSM[AmazonSSMManagedInstanceCore]
-    CW[CloudWatchAgentServerPolicy]
-    EBS["2 GiB encrypted gp3 EBS<br/>attached as /dev/sdf"]
-    Outputs["Outputs: instance public IP<br/>instance ID<br/>PostgreSQL volume ID"]
-    CloudTrail[CloudTrail]
+    Route[Default internet route]
+    SG[Security group]
+    EC2["Ubuntu 24.04 EC2<br/>t3.micro default<br/>20 GiB encrypted gp3 root disk<br/>IMDSv2 required"]
+    Role["EC2 role and instance profile<br/>SSM, CloudWatch, EBS CSI permissions"]
+    Outputs["Instance ID and public IP outputs"]
 
-    Variables --> VPC
     VPC --> Subnet
     VPC --> IGW
-    VPC --> RT
-    RT --> Association
-    IGW --> RT
-    Subnet --> Association
+    IGW --> Route
+    Subnet --> Route
     Subnet --> EC2
     SG --> EC2
-    Association --> EC2
     Role --> EC2
-    Role --> SSM
-    Role --> CW
-    EC2 --> EBS
     EC2 --> Outputs
-    EBS --> Outputs
   end
 
-  S3 -. Backend bucket configured in infra .-> InfraState[("Infra state key:<br/>terraform/terraform.tfstate")]
-  CloudTrail -. Current reference points to the bootstrap root resource .-> S3
+  Infra --> InfraState
+  EC2 --> Ansible[Ansible host setup]
+  Ansible --> K3s[K3s]
+  K3s --> ArgoCD[Argo CD]
+  ArgoCD --> EBSCSI[EBS CSI driver]
+  EBSCSI --> PVC["PostgreSQL PVC requests 2 Gi"]
+  PVC --> EBS["Encrypted gp3 EBS volume"]
+~~~
 
-  classDef root fill:#edf2ff,stroke:#4263a5,color:#172b4d
-  classDef storage fill:#e9f7ef,stroke:#31845b,color:#163c2b
-  classDef network fill:#e8f1ff,stroke:#356ac3,color:#172b4d
-  classDef compute fill:#fff3df,stroke:#c17a16,color:#50330d
-  classDef security fill:#f8eafa,stroke:#914c9c,color:#3b1d42
-  classDef output fill:#f1f3f5,stroke:#68717a,color:#20262b
-  class Bootstrap,Infra,BTF,Variables root
-  class S3,Versioning,Encryption,PublicBlock,BState,InfraState,EBS storage
-  class VPC,Subnet,IGW,RT,Association,SG network
-  class EC2 compute
-  class Role,SSM,CW,CloudTrail security
-  class Outputs output
-```
+The PostgreSQL data path is Kubernetes-driven: its PVC uses the AWS StorageClass, and the EBS CSI driver creates and mounts the volume. Terraform declares the EC2 and IAM foundation rather than a PostgreSQL EBS volume or attachment.
 
-## Declared resources
+## Resource responsibilities
 
-### `terraform/bootstrap`
+| Component | Responsibility |
+|---|---|
+| Terraform backend root | S3 bucket, versioning, encryption, and public-access blocking |
+| Terraform infrastructure root | VPC, public subnet, Internet Gateway, route, security group, EC2, instance profile, and outputs |
+| EC2 instance profile | SSM and CloudWatch access, plus the permissions used by the EBS CSI driver |
+| Ansible | K3s and Argo CD host setup |
+| EBS CSI and StorageClass | Create and connect PostgreSQL's EBS volume from the PVC request |
+| Argo CD | Reconcile Kubernetes resources declared in Git |
 
-- Creates the `seob-bucket` S3 bucket.
-- Enables bucket versioning, AES256 server-side encryption, and S3 Block Public Access.
-- Declares an S3 backend for bootstrap state.
+The EC2 role currently attaches AmazonEBSCSIDriverPolicy. In this single-node K3s design, the driver uses the EC2 instance identity. This is a deliberate simplicity trade-off: instance-profile access should be treated as a node-level security boundary, and Pod access to EC2 metadata should be restricted.
 
-### `terraform/infra`
+## Workflow and change control
 
-- Creates a VPC, one public subnet, an Internet Gateway, a default internet route, and a route-table association.
-- Creates an EC2 security group with unrestricted outbound IPv4 and no inbound rules declared in this Terraform configuration.
-- Creates an Ubuntu 24.04 EC2 instance with a public IPv4 address, a 20 GiB encrypted gp3 root disk, and IMDSv2 required.
-- Creates an EC2 role/profile with `AmazonSSMManagedInstanceCore` and `CloudWatchAgentServerPolicy` attached.
-- Creates an encrypted 2 GiB gp3 EBS volume and attaches it to EC2 as `/dev/sdf`.
-- Declares outputs for the instance public IP, instance ID, and EBS volume ID.
-- Declares a CloudTrail resource.
+The initial backend setup is exposed as a manual workflow. Separate workflow definitions cover backend changes, infrastructure changes, and host configuration. Workflow-level permissions control whether a GitHub Actions run can request AWS credentials. Infrastructure execution is therefore tied to an explicit workflow authorization.
 
-## State layout
+Application image changes follow a separate path: GitHub Actions builds the changed collector image, publishes a commit-SHA tag to GHCR, and updates the corresponding Kubernetes image tag. Argo CD then reconciles the Git change.
 
-Both roots are configured to use `seob-bucket`, with different state keys intended to keep their state separate:
+## Design choices
 
-- `infra`: `terraform/terraform.tfstate`
-- `bootstrap`: the current `terraform/bootstrap/terraform.tf` contains two backend declarations with different keys. Resolve that duplicate before using the configuration.
+- A single public subnet and EC2 instance keep the first AWS environment small and easy to reason about. The security group declares outbound access and no inbound rule; SSM is the intended management channel.
+- The EC2 root disk is separate from PostgreSQL's database volume.
+- The PostgreSQL PVC requests 2Gi. The EBS CSI StorageClass selects encrypted gp3 and Retain, so a claim deletion does not automatically remove the data volume.
+- There is no Terraform-managed attachment for PostgreSQL. The CSI driver owns attach and mount operations, avoiding two controllers managing the same attachment.
 
-The S3 backend stores Terraform state; it does not create its own bucket. The bucket resource is declared in the bootstrap root.
+## Files
 
-## Current configuration limits
-
-- The bootstrap `.tf` files currently contain duplicated resource/backend blocks and `---` separator lines. As written, they need cleanup before Terraform can validate or run.
-- The CloudTrail configuration in `terraform/infra/compute.tf` refers to `aws_s3_bucket.seob_s3`, which is declared in a different Terraform root. Terraform roots do not share resource addresses directly. The current CloudTrail bucket reference is therefore not a valid cross-root connection.
-- Terraform only attaches the EBS volume. The current Terraform files do not format or mount it, nor connect it to a Kubernetes PVC.
-- The diagrams describe declared Terraform configuration only. No Terraform validation, plan, or AWS apply was run while updating this README.
-
+- backend/terraform.tf — Terraform version, AWS provider, and S3 backend key.
+- backend/state.tf — state bucket protections.
+- infra/terraform.tf — Terraform version, AWS provider, and infrastructure state key.
+- infra/network.tf — VPC, subnet, Internet Gateway, route, and security group.
+- infra/compute.tf — EC2 instance and CloudTrail declaration.
+- infra/iam.tf — EC2 role, instance profile, and attached policies.
+- infra/variables.tf — region, CIDRs, Availability Zone, and instance type.
+- infra/outputs.tf — instance ID and public IP for host configuration.

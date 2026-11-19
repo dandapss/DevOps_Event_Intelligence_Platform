@@ -1,93 +1,114 @@
 # Event Intelligence Platform
 
-A personal DevOps project for collecting stock prices and related news on a schedule, storing the results in PostgreSQL, and operating the workloads on Kubernetes. Stock data is the main scope; this project does not provide investment advice or place trades.
+A DevOps portfolio project built around a scheduled stock-data service. Python collectors retrieve market data, PostgreSQL stores the observations, and Kubernetes runs the collectors as CronJobs. The project focuses on the delivery and operation of that service: infrastructure as code, CI, GitOps, persistent storage, and monitoring components.
+
+## Why this project
+
+Provisioning a cluster is only the starting point. The central problem here is keeping a small stateful data pipeline repeatable: collect on a schedule, store records safely, and make infrastructure and application changes traceable through Git.
+
+The design separates the responsibilities:
+
+- Terraform describes AWS infrastructure and the remote state bucket.
+- Ansible prepares the EC2 host and installs K3s and Argo CD.
+- Argo CD reconciles Kubernetes resources from this repository.
+- GitHub Actions validates changes and builds only the collector images affected by source changes.
+- PostgreSQL stores application data; Prometheus and Grafana are platform monitoring components.
 
 ## Architecture
 
-```mermaid
-flowchart TB
-  Dev[Developer] --> Repo
+~~~mermaid
+flowchart LR
+  Developer[Developer] --> GitHubRepo
 
-  subgraph GitHub[GitHub]
-    Repo[Project repository]
+  subgraph GitHub["GitHub"]
+    GitHubRepo[Git repository]
     Actions[GitHub Actions]
-    GHCR[GHCR container images]
-    Repo --> Actions
-    Actions -->|Build and publish changed collectors| GHCR
+    GHCR[GHCR]
+    GitHubRepo --> Actions
+    Actions -->|Build and publish changed collector image| GHCR
+    Actions -->|Commit immutable image tag| GitHubRepo
   end
 
-  subgraph Local[Local development - kind]
-    ArgoLocal[Argo CD]
-    subgraph LocalCluster[Kubernetes workloads]
-      LStock[Stock collector CronJob]
-      LNews[News collector CronJob]
-      LDB[PostgreSQL]
-      LProm[Prometheus]
-      LGraf[Grafana]
-    end
-    ArgoLocal --> LocalCluster
-    LStock --> LDB
-    LNews --> LDB
-  end
-
-  Repo -. GitOps manifests .-> ArgoLocal
-  GHCR -->|Image pull| LStock
-  GHCR -->|Image pull| LNews
-  StockAPI[Stock data provider] --> LStock
-  NewsRSS[Yahoo Finance RSS] --> LNews
-
-  subgraph AWS[AWS production target - not yet verified]
-    TF[Terraform configuration]
+  subgraph AWS["AWS and Kubernetes deployment design"]
+    Terraform[Terraform]
     VPC[VPC and public subnet]
-    EC2[EC2 Linux host]
-    K3s[k3s cluster]
-    ArgoAWS[Argo CD]
-    subgraph AWSCluster[Kubernetes workloads]
-      PStock[Stock collector CronJob]
-      PNews[News collector CronJob]
-      PDB[PostgreSQL]
-      PProm[Prometheus]
-      PGraf[Grafana]
-    end
-    TF --> VPC --> EC2 --> K3s --> ArgoAWS --> AWSCluster
-    PStock --> PDB
-    PNews --> PDB
+    EC2[Ubuntu EC2]
+    HostSetup[Ansible]
+    K3s[K3s]
+    ArgoCD[Argo CD]
+    EBSCSI[EBS CSI driver]
+    StorageClass[Encrypted gp3 StorageClass]
+    PostgreSQL[PostgreSQL]
+    PVC[PostgreSQL PVC]
+    EBS[(EBS volume)]
+    StockJob[Stock CronJob]
+    NewsJob[News CronJob]
+    Prometheus[Prometheus]
+    Grafana[Grafana]
+
+    Terraform --> VPC --> EC2
+    Terraform -->|EC2 role and instance profile| EC2
+    HostSetup -->|K3s and Argo CD setup| EC2
+    EC2 --> K3s --> ArgoCD
+    ArgoCD -->|Syncs Kubernetes resources from Git| K3s
+    ArgoCD --> EBSCSI
+    ArgoCD --> StorageClass
+    ArgoCD --> PostgreSQL
+    PostgreSQL --> PVC --> StorageClass
+    EBSCSI -->|Creates, attaches and mounts| EBS
+    EBS --> PostgreSQL
+    ArgoCD --> StockJob
+    ArgoCD --> NewsJob
+    ArgoCD --> Prometheus
+    ArgoCD --> Grafana
+    GHCR -->|Image pull| StockJob
+    GHCR -->|Image pull| NewsJob
   end
 
-  GHCR -. Future image pull .-> PStock
-  GHCR -. Future image pull .-> PNews
-  StockAPI -.-> PStock
-  NewsRSS -.-> PNews
+  GitHubRepo -.->|GitOps manifests| ArgoCD
+  StockAPI[Stock data provider] --> StockJob
+  YahooRSS[Yahoo Finance RSS] --> NewsJob
+  StockJob --> PostgreSQL
+  NewsJob --> PostgreSQL
 
-  classDef source fill:#e8f1ff,stroke:#356ac3,color:#172b4d
-  classDef github fill:#f0eaff,stroke:#7048a8,color:#2d1b45
-  classDef local fill:#e8f7ef,stroke:#31845b,color:#163c2b
-  classDef target fill:#fff3df,stroke:#c17a16,color:#50330d
-  class Dev,StockAPI,NewsRSS source
-  class Repo,Actions,GHCR github
-  class ArgoLocal,LocalCluster,LStock,LNews,LDB,LProm,LGraf local
-  class TF,VPC,EC2,K3s,ArgoAWS,AWSCluster,PStock,PNews,PDB,PProm,PGraf target
-```
+  S3[(S3 Terraform state bucket)]
+  Terraform -.->|backend and infrastructure state keys| S3
+~~~
 
-The AWS box shows the declared production target, not a completed deployment. Dashed arrows mark target or external connections.
+## Design decisions
 
-## Project status
+### Storage ownership
 
-- The repository contains Python stock and news collectors, container build definitions, Kubernetes manifests, and Helm configuration for PostgreSQL and monitoring components.
-- GitHub Actions is configured for path-based validation and collector image publishing to GHCR.
-- Local kind is the development target. AWS EC2/k3s is described as a target, not a completed deployment.
-- The Terraform files are still being prepared. See [Terraform notes](terraform/README.md) for the resources and current configuration limits.
-- Grafana dashboard and alert work is not presented here as complete.
+PostgreSQL declares its storage need through a 2 Gi PVC. The EBS CSI driver provisions an encrypted gp3 EBS volume from the AWS StorageClass, then handles attachment and mounting for the Pod. Terraform supplies the EC2 and IAM foundation; it does not create or attach PostgreSQL's data volume.
 
-## Storage and cost
+This keeps the Kubernetes storage request and its AWS volume lifecycle together. It also avoids Terraform and Kubernetes both trying to control the same EBS attachment. The StorageClass uses Retain so deleting a claim does not automatically discard database data.
 
-The Terraform configuration declares an encrypted 2 GiB EBS volume for PostgreSQL. The S3 bucket is for Terraform state and serves a separate purpose. Review the Terraform plan and AWS charges before applying resources.
+### Separate Terraform state scopes
 
-## Project notes
+The S3 bucket is Terraform's state storage, not PostgreSQL storage. The backend root creates and protects the bucket; the infrastructure root stores its state under a different key in that bucket. Each root has its own resource graph and state.
 
-- [Project blueprint](docs/PROJECT_BLUEPRINT.md)
-- [MVP specification](docs/MVP_SPEC.md)
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
-- [AWS setup checklist](docs/AWS_CONNECTIONS.md)
-- [Terraform notes](terraform/README.md)
+### Short-lived collectors
 
+The stock and news collectors run as separate CronJobs, with different schedules. This isolates their execution and lets each image be rebuilt when its own source changes.
+
+## Repository map
+
+- src/ — Python collector applications and Dockerfiles.
+- kubernetes/ — Argo CD Applications, Helm wrapper charts, CronJobs, and Kubernetes configuration.
+- terraform/backend/ — S3 bucket and Terraform backend bootstrap.
+- terraform/infra/ — AWS network, EC2, IAM, and instance outputs.
+- ansible/ — K3s and Argo CD host setup.
+- .github/workflows/ — change detection, validation, image publishing, and infrastructure workflow definitions.
+- docs/ — project blueprint, MVP scope, implementation plan, and AWS connection decisions.
+
+## Delivery flow
+
+A source change builds the matching collector image and publishes a commit-SHA tag to GHCR. GitHub Actions updates the Kubernetes image tag in Git, and Argo CD reconciles that Git change on the cluster.
+
+Infrastructure and application delivery have separate paths: Terraform describes AWS resources, Ansible configures the EC2 host, and Argo CD manages Kubernetes workloads. This separation makes each change's owner and scope visible in the repository.
+
+## Operating boundaries
+
+The design uses one EC2 K3s node and a 2 Gi PostgreSQL volume. It keeps the learning environment small and understandable; it is not a high-availability database design.
+
+The current repository uses example database credentials in Kubernetes configuration. For an AWS environment, provide them through a Kubernetes Secret rather than committing real credentials to Git.
