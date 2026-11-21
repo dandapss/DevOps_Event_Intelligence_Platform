@@ -1,8 +1,8 @@
 ### IAM ###
 
-#----------#
-# IAM Role #
-#----------#
+#------#
+# Data #
+#------#
 data "aws_iam_policy_document" "ec2_assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -13,6 +13,22 @@ data "aws_iam_policy_document" "ec2_assume_role" {
     }
   }
 }
+
+data "aws_iam_policy_document" "postgresql_parameter_read" {
+  statement {
+    sid = "ReadPostgresSQLCredentials"
+    actions = ["ssm:GetParameter"]
+
+    resources = [
+      "arn:aws:ssm:eu-central-1:236608206962:parameter/eip/prod/postgresql/admin-password",
+      "arn:aws:ssm:eu-central-1:236608206962:parameter/eip/prod/postgresql/app-password"
+    ]
+  }
+}
+
+#----------#
+# IAM Role #
+#----------#
 
 resource "aws_iam_role" "seob_role" {
   description = "Role used by the EC2 instance"
@@ -44,4 +60,10 @@ resource "aws_iam_role_policy_attachment" "cloudwatch" {
 resource "aws_iam_role_policy_attachment" "ebs_csi" {
   role = aws_iam_role.seob_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_iam_role_policy" "postgresql_parameter_read" {
+  name = "postgresql-parameter-read"
+  role = aws_iam_role.seob_role.id
+  policy = data.aws_iam_policy_document.postgresql_parameter_read.json
 }

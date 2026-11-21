@@ -11,6 +11,7 @@
       apt:
         name:
           - curl
+          - awscli
         state: present
 
     # s: silent, f: detect failure, L: follow redirection

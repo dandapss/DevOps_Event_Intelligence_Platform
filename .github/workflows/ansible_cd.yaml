@@ -27,13 +27,14 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::236608206962:role/eip-github-actions-terraform
           aws-region: eu-central-1
 
       - name: Install Ansible
         run: |
           python -m pip install --upgrade pip
-          pip install ansible boto3 botocore amazon.aws
+          pip install ansible boto3 botocore 
+          ansible-galaxy collection install amazon.aws
 
       - name: Get Terraform Outputs
         working-directory: terraform/infra
