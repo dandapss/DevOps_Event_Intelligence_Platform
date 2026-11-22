@@ -13,7 +13,11 @@ CREATE TABLE IF NOT EXISTS stock_prices (
 
   market_status VARCHAR(20) NOT NULL,
 
-  collected_at TIMESTAMP NOT NULL DEFAULT NOW()
+  observed_at TIMESTAMPTZ NOT NULL,
+  collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT uq_stock_prices_symbol_observed_at
+    UNIQUE (symbol, observed_at)
 );
 
 CREATE INDEX IF NOT EXISTS idx_stock_prices_symbol ON stock_prices(symbol);
@@ -32,11 +36,12 @@ CREATE TABLE IF NOT EXISTS stock_news (
 
   summary TEXT NOT NULL,
 
-  published_at TIMESTAMP,
+  published_at TIMESTAMPTZ,
 
   url TEXT NOT NULL UNIQUE,
 
-  collected_at TIMESTAMP NOT NULL DEFAULT NOW()
+  collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
 );
 
 CREATE INDEX IF NOT EXISTS idx_stock_news_symbol ON stock_news(symbol);

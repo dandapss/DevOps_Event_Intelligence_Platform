@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 import psycopg2
 import yfinance as yf
@@ -8,7 +8,9 @@ DB_HOST = os.getenv("DB_HOST", "postgresql")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "event_intelligence")
 DB_USER = os.getenv("DB_USER", "db_user")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "db_password")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+if not DB_PASSWORD:
+  raise RuntimeError("DB_PASSWORD environment variable is required")
 
 SYMBOLS = os.getenv(
   "SYMBOLS",
@@ -31,6 +33,12 @@ def get_stock_data(symbol: str):
 
   current_price = info.get("currentPrice")
   previous_close = info.get("previousClose")
+  observed_epoch = info.get("regularMarketTime")
+
+  if observed_epoch is None:
+    raise ValueError(f"Provider observation time not found for {symbol}")
+
+  observed_at = datetime.fromtimestamp(observed_epoch, tz=timezone.utc)
 
   if current_price is None or previous_close is None:
     raise Exception(
@@ -48,7 +56,8 @@ def get_stock_data(symbol: str):
     "change_percent": change_percent,
     "currency": info.get("currency", "UNKNOWN"),
     "market_status": info.get("marketState", "UNKNOWN"),
-    "collected_at": datetime.utcnow()
+    "observed_at": observed_at,
+    "collected_at": datetime.now(timezone.utc)
   }
 
 def save_stock(data: dict):
@@ -59,9 +68,10 @@ def save_stock(data: dict):
       cur.execute(
         """
         INSERT INTO stock_prices
-        (symbol,current_price,previous_close,change_percent,currency,market_status,collected_at)
+        (symbol,current_price,previous_close,change_percent,currency,market_status,collected_at,observed_at)
         VALUES
-        (%s,%s,%s,%s,%s,%s,%s)
+        (%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (symbol, observed_at) DO NOTHING
         """,
         (
           data["symbol"],
@@ -70,7 +80,8 @@ def save_stock(data: dict):
           data["change_percent"],
           data["currency"],
           data["market_status"],
-          data["collected_at"]
+          data["collected_at"],
+          data["observed_at"]
         )
       )
     conn.commit()

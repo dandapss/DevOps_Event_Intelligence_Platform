@@ -12,6 +12,7 @@
         name:
           - curl
           - awscli
+          - python3-kubernetes
         state: present
 
     # s: silent, f: detect failure, L: follow redirection

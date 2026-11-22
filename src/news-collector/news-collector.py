@@ -1,5 +1,6 @@
 import os
-from datetime import datetime
+import calendar
+from datetime import datetime, timezone
 from urllib.request import urlopen, Request
 import psycopg2
 import feedparser as fp
@@ -8,7 +9,9 @@ DB_HOST = os.getenv("DB_HOST", "postgresql")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "event_intelligence")
 DB_USER = os.getenv("DB_USER", "db_user")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "db_password")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+if not DB_PASSWORD:
+  raise RuntimeError("DB_PASSWORD environment variable is required")
 
 SYMBOLS = os.getenv(
   "SYMBOLS",
@@ -85,13 +88,22 @@ def main():
             symbol_failed = True
             continue
 
+          published_parts = entry.get("published_parsed")
+          published_at = (
+            datetime.fromtimestamp(
+              calendar.timegm(published_parts), tz=timezone.utc,
+            )
+            if published_parts
+            else None
+          )
+
           data = {
             "symbol" : symbol,
             "title" : title,
             "summary" : entry.get("summary") or "",
-            "published_at" : entry.get("published"),
+            "published_at" : published_at,
             "url" : url,
-            "collected_at" : datetime.now()
+            "collected_at" : datetime.now(timezone.utc)
           }
 
           save_news(data, conn)

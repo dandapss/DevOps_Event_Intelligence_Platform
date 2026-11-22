@@ -30,9 +30,12 @@ flowchart TB
   Repo -. GitOps manifests .-> ArgoCD[Argo CD]
   Terraform[Terraform] --> VPC[VPC and public subnet]
   VPC --> EC2[Ubuntu EC2]
-  Ansible[Ansible] --> K3s[K3s]
+  Actions -->|Ansible over SSM| Ansible[Ansible]
+  Ansible --> K3s[K3s]
   EC2 --> K3s
   K3s --> ArgoCD
+  Operator[Operator] -->|kubectl apply once| RootApp[Root Application]
+  RootApp -. watches kubernetes/ .-> Repo
 
   subgraph Cluster[Kubernetes on EC2]
     direction TB
@@ -41,8 +44,12 @@ flowchart TB
     ArgoCD --> PostgreSQL[PostgreSQL]
     ArgoCD --> EBSCSI[EBS CSI driver]
     ArgoCD --> Monitoring[Prometheus and Grafana]
+    Secret[Kubernetes Secret]
     Stock --> PostgreSQL
     News --> PostgreSQL
+    Secret --> PostgreSQL
+    Secret --> Stock
+    Secret --> News
     PostgreSQL --> PVC[2 Gi PVC]
     PVC --> SC[Encrypted gp3 StorageClass]
     EBSCSI -->|Creates and mounts| EBS[(EBS volume)]
@@ -51,7 +58,9 @@ flowchart TB
 
   GHCR -->|Image pull| Stock
   GHCR -->|Image pull| News
-  StockSource[Stock data provider] --> Stock
+  EC2 -->|GetParameter| SSM[(AWS Systems Manager Parameter Store)]
+  Ansible -->|Creates Secret| Secret
+  StockSource[Yahoo Finance via yfinance] --> Stock
   NewsSource[Yahoo Finance RSS] --> News
   Terraform -. State keys .-> S3[(S3 state bucket)]
 
@@ -71,7 +80,7 @@ flowchart TB
 
 PostgreSQL declares its storage need through a 2 Gi PVC. The EBS CSI driver provisions an encrypted gp3 EBS volume from the AWS StorageClass, then handles attachment and mounting for the Pod. Terraform supplies the EC2 and IAM foundation; it does not create or attach PostgreSQL's data volume.
 
-This keeps the Kubernetes storage request and its AWS volume lifecycle together. It also avoids Terraform and Kubernetes both trying to control the same EBS attachment. The StorageClass uses Retain so deleting a claim does not automatically discard database data.
+This keeps the Kubernetes storage request and its AWS volume lifecycle together. It also avoids Terraform and Kubernetes both trying to control the same EBS attachment.
 
 ### Separate Terraform state scopes
 
@@ -93,12 +102,14 @@ The stock and news collectors run as separate CronJobs, with different schedules
 
 ## Delivery flow
 
-A source change builds the matching collector image and publishes a commit-SHA tag to GHCR. GitHub Actions updates the Kubernetes image tag in Git, and Argo CD reconciles that Git change on the cluster.
+After Ansible installs Argo CD, the operator applies `kubernetes/argocd/root-app.yaml` once with `kubectl`. Its source points to `kubernetes/`, where the root Kustomization includes the root Application manifest and the child Application manifests. From then on, Argo CD reconciles those Application definitions from Git, including its own root Application.
+
+When collector source changes on `main`, GitHub Actions builds the matching image and publishes both a commit-SHA tag and `latest` to GHCR. It updates the Kubernetes manifest to the commit-SHA tag, and Argo CD reconciles that Git change. The manifest uses the SHA tag, so deployment does not follow the mutable `latest` tag.
 
 Infrastructure and application delivery have separate paths: Terraform describes AWS resources, Ansible configures the EC2 host, and Argo CD manages Kubernetes workloads. This separation makes each change's owner and scope visible in the repository.
 
 ## Operating boundaries
 
-The design uses one EC2 K3s node and a 2 Gi PostgreSQL volume. It keeps the learning environment small and understandable; it is not a high-availability database design.
+The production design uses one EC2 K3s node and a 2 Gi PostgreSQL PVC. The StorageClass provisions an encrypted gp3 EBS volume. This is a small single-node learning environment, not a high-availability database design.
 
-The current repository uses example database credentials in Kubernetes configuration. For an AWS environment, provide them through a Kubernetes Secret rather than committing real credentials to Git.
+The Ansible playbook is configured to read the PostgreSQL admin and application passwords from AWS Systems Manager Parameter Store as `SecureString` values while running on EC2. It creates the `eip-postgresql-auth` Kubernetes Secret, which PostgreSQL and both collectors reference. The password values are not stored in the Kubernetes manifests in Git.

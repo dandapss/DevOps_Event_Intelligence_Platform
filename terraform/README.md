@@ -9,7 +9,7 @@ terraform/backend and terraform/infra are independent Terraform root modules. Ea
 | Root | Purpose | State key |
 |---|---|---|
 | terraform/backend | Creates and protects the Terraform state bucket | backend.tfstate |
-| terraform/infra | Describes the network, EC2 host, IAM, and CloudTrail | infra.tfstate |
+| terraform/infra | Describes the network, EC2 host, IAM, and instance outputs | infra.tfstate |
 
 The bucket has versioning, AES-256 server-side encryption, and S3 Block Public Access enabled. The S3 bucket stores Terraform state; it is separate from the EBS volume used for PostgreSQL data.
 
@@ -77,7 +77,7 @@ The PostgreSQL data path is Kubernetes-driven: its PVC uses the AWS StorageClass
 | Terraform backend root | S3 bucket, versioning, encryption, and public-access blocking |
 | Terraform infrastructure root | VPC, public subnet, Internet Gateway, route, security group, EC2, instance profile, and outputs |
 | EC2 instance profile | SSM and CloudWatch access, plus the permissions used by the EBS CSI driver |
-| Ansible | K3s and Argo CD host setup |
+| Ansible | Install K3s and Argo CD; the root Application is bootstrapped manually once |
 | EBS CSI and StorageClass | Create and connect PostgreSQL's EBS volume from the PVC request |
 | Argo CD | Reconcile Kubernetes resources declared in Git |
 
@@ -85,7 +85,9 @@ The EC2 role currently attaches AmazonEBSCSIDriverPolicy. In this single-node K3
 
 ## Workflow and change control
 
-The initial backend setup is exposed as a manual workflow. Separate workflow definitions cover backend changes, infrastructure changes, and host configuration. Workflow-level permissions control whether a GitHub Actions run can request AWS credentials. Infrastructure execution is therefore tied to an explicit workflow authorization.
+The initial backend setup is exposed as a manual workflow. It initializes the backend root without connecting to S3, creates the bucket using temporary local state, then migrates that state to the S3 backend. After this one-time bootstrap, changes under `terraform/backend/` use the normal remote-state workflow.
+
+On `main`, changes under `terraform/backend/` or `terraform/infra/` call their matching Terraform workflow. Each workflow definition runs `terraform plan` followed by `terraform apply --auto-approve`. After an infrastructure apply, the workflow is configured to call Ansible to install K3s and Argo CD. The operator then applies `kubernetes/argocd/root-app.yaml` once with `kubectl`. The root Application points at `kubernetes/`; that directory's Kustomization includes both the root Application manifest and the child Application manifests, so Argo CD keeps all of them aligned with Git after bootstrap.
 
 Application image changes follow a separate path: GitHub Actions builds the changed collector image, publishes a commit-SHA tag to GHCR, and updates the corresponding Kubernetes image tag. Argo CD then reconciles the Git change.
 
@@ -93,7 +95,7 @@ Application image changes follow a separate path: GitHub Actions builds the chan
 
 - A single public subnet and EC2 instance keep the first AWS environment small and easy to reason about. The security group declares outbound access and no inbound rule; SSM is the intended management channel.
 - The EC2 root disk is separate from PostgreSQL's database volume.
-- The PostgreSQL PVC requests 2Gi. The EBS CSI StorageClass selects encrypted gp3 and Retain, so a claim deletion does not automatically remove the data volume.
+- The PostgreSQL PVC requests 2Gi. The EBS CSI StorageClass provisions an encrypted gp3 volume from that request.
 - There is no Terraform-managed attachment for PostgreSQL. The CSI driver owns attach and mount operations, avoiding two controllers managing the same attachment.
 
 ## Files
@@ -102,7 +104,7 @@ Application image changes follow a separate path: GitHub Actions builds the chan
 - backend/state.tf — state bucket protections.
 - infra/terraform.tf — Terraform version, AWS provider, and infrastructure state key.
 - infra/network.tf — VPC, subnet, Internet Gateway, route, and security group.
-- infra/compute.tf — EC2 instance and CloudTrail declaration.
+- infra/compute.tf — EC2 instance configuration.
 - infra/iam.tf — EC2 role, instance profile, and attached policies.
 - infra/variables.tf — region, CIDRs, Availability Zone, and instance type.
 - infra/outputs.tf — instance ID and public IP for host configuration.

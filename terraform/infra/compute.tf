@@ -46,11 +46,12 @@ resource "aws_instance" "seob_vm" {
 #------------#
 # Cloudtrail #
 #------------#
-resource "aws_cloudtrail" "seob_cloudtrail" {
-  name = "seob-cloudtrail"
-
-  s3_bucket_name = aws_s3_bucket.seob_s3.id
-
-  depends_on = [aws_s3_bucket.seob_s3]
-}
+# resource "aws_cloudtrail" "seob_cloudtrail" {
+#  name = "seob-cloudtrail"
+#
+#  s3_bucket_name = aws_s3_bucket.seob_s3.id
+#
+#  depends_on = [aws_s3_bucket.seob_s3]
+#}
 # Create separate bucket for cloudtrail
+# Add Cloudtrail as an update later

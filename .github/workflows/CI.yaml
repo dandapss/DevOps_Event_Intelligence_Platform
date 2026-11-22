@@ -13,10 +13,22 @@ on:
       - 'terraform/**'
       - 'ansible/**'
       - '.github/workflows/CI.yaml'
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'kubernetes/**'
+      - 'terraform/**'
+      - 'ansible/**'
+      - '.github/workflows/CI.yaml'
+
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
 
@@ -78,7 +90,8 @@ jobs:
           fetch-depth: 0
 
       - run: |
-          echo "terraform=${{ needs.changes.outputs.terraform }}"
+          echo "terraform_backend=${{ needs.changes.outputs.terraform_backend }}"
+          echo "terraform_infra=${{ needs.changes.outputs.terraform_infra }}"
           echo "ansible=${{ needs.changes.outputs.ansible }}"
           echo "kubernetes=${{ needs.changes.outputs.kubernetes }}"
           echo "images=${{ needs.changes.outputs.images }}"
@@ -253,6 +266,30 @@ jobs:
  #------------------#
  # Terraform CD End #
  #------------------#
+
+
+ # if called -------#
+ # Ansible CD Start #
+ #------------------#
+
+  ansible-cd:
+    needs:
+      - changes
+      - terraform-validate
+      - ansible-validate
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.terraform_backend == 'false' &&
+      needs.changes.outputs.terraform_infra == 'false' &&
+      needs.changes.outputs.ansible == 'true' &&
+      needs.ansible-validate.result == 'success'
+
+    uses: ./.github/workflows/ansible_cd.yaml
+
+ #----------------#
+ # Ansible CD End #
+ #----------------#
 
 
  # if called ---------#

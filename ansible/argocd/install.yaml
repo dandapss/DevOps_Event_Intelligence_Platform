@@ -1,6 +1,5 @@
 - name: Install ArgoCD
   hosts: k3s
-# what is "become true"? am i Jesus? 
   become: true
 
   tasks:
@@ -9,12 +8,20 @@
         helm repo add argo https://argoproj.github.io/argo-helm
         helm repo update
 
+    - name: Copy ArgoCD Helm values to EC2
+      ansible.builtin.shell: |
+        src: "{{ playbook_dir }}/argocd/values.yaml"
+        dest: /tmp/argocd-values.yaml
+        owner: root
+        group: root
+        mode: "0600"
+
     - name: Install ArgoCD
       shell: |
         helm upgrade --install argocd argo/argo-cd \
           --namespace argocd \
           --create-namespace \
-          -f {{ playbook_dir }}/values.yaml
+          -f /tmp/argocd-values.yaml
 
     - name: Wait for ArgoCD Server
       shell: |
