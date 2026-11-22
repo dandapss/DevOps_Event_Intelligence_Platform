@@ -31,10 +31,25 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Clear taint from verified existing resources
+      - name: Clear taint markers when present
+        shell: bash
         run: |
-          terraform untaint aws_iam_role.seob_role
-          terraform untaint aws_s3_bucket.ansible_ssm_transfer
+          untaint_if_needed() {
+            local address="$1"
+            local output
+
+            if output=$(terraform untaint "$address" 2>&1); then
+              echo "$output"
+            elif [[ "$output" == *"is not currently tainted"* ]]; then
+              echo "$address is already untainted; skipping."
+            else
+              echo "$output"
+              return 1
+            fi
+          }
+
+          untaint_if_needed aws_iam_role.seob_role
+          untaint_if_needed aws_s3_bucket.ansible_ssm_transfer
 
       - name: Terraform Plan
         run: terraform plan
