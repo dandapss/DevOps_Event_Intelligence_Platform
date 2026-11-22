@@ -37,7 +37,8 @@ jobs:
           for address in \
             aws_iam_role.seob_role \
             aws_s3_bucket.ansible_ssm_transfer \
-            aws_vpc.seob_vpc
+            aws_vpc.seob_vpc \
+            aws_iam_role_policy.postgresql_parameter_read
           do
             if output=$(terraform untaint -no-color "$address" 2>&1); then
               printf '%s\n' "$output"
