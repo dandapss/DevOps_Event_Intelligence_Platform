@@ -4,35 +4,47 @@
 
   tasks:
     - name: Add ArgoCD Helm Repo
-      shell: |
-        helm repo add argo https://argoproj.github.io/argo-helm --force-update
-        helm repo update
+      kubernetes.core.helm_repository:
+        name: argo
+        repo_url: https://argoproj.github.io/argo-helm
 
     - name: Copy ArgoCD Helm values to EC2
-      ansible.builtin.copy: 
+      ansible.builtin.copy:
         src: "{{ playbook_dir }}/argocd/values.yaml"
         dest: /tmp/argocd-values.yaml
         owner: root
         group: root
         mode: "0600"
 
-    - name: Install ArgoCD
-      shell: |
-        helm upgrade --install argocd argo/argo-cd \
-          --namespace argocd \
-          --create-namespace \
-          -f /tmp/argocd-values.yaml
+    - name: Install or upgrade ArgoCD
+      kubernetes.core.helm:
+        name: argocd
+        chart_ref: argo/argo-cd
+        release_namespace: argocd
+        create_namespace: true
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+        values_files:
+          - /tmp/argocd-values.yaml
+        update_repo_cache: true
+        state: present
 
     - name: Wait for ArgoCD Server
-      shell: |
-        kubectl get deployment argocd-server \
-        -n argocd \
-        -o jsonpath='{.status.readyReplicas}'
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - deployment
+          - argocd-server
+          - --namespace
+          - argocd
+          - -o
+          - jsonpath={.status.readyReplicas}
       register: argocd_status
+      changed_when: false
       retries: 30
       delay: 10
-      until: argocd_status.stdout == "1"
+      until: (argocd_status.stdout | int) >= 1
 
     - name: Show ArgoCD Status
-      debug:
+      ansible.builtin.debug:
         var: argocd_status.stdout

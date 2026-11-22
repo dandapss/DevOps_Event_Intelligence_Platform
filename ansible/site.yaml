@@ -1,8 +1,7 @@
 # Running all the ansible in order
 
-- import_playbook: k3s/install.yaml
+- ansible.builtin.import_playbook: k3s/install.yaml
 
-- import_playbook: secret/install.yaml
+- ansible.builtin.import_playbook: secret/install.yaml
 
-- import_playbook: argocd/install.yaml
-
+- ansible.builtin.import_playbook: argocd/install.yaml

@@ -4,47 +4,84 @@
 
   tasks:
     - name: Update apt cache
-      apt:
+      ansible.builtin.apt:
         update_cache: true
 
     - name: Install required packages
-      apt:
+      ansible.builtin.apt:
         name:
           - curl
           - awscli
           - python3-kubernetes
         state: present
 
-    # s: silent, f: detect failure, L: follow redirection
+    - name: Check whether k3s is installed
+      ansible.builtin.stat:
+        path: /etc/rancher/k3s/k3s.yaml
+      register: k3s_config
+
+    - name: Download k3s installer
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /tmp/install-k3s.sh
+        mode: "0755"
+      when: not k3s_config.stat.exists
+
     - name: Install k3s
-      shell: |
-        curl -sfL https://get.k3s.io | sh -
+      ansible.builtin.command:
+        argv:
+          - /bin/sh
+          - /tmp/install-k3s.sh
       args:
         creates: /etc/rancher/k3s/k3s.yaml
 
     - name: Start and Enable k3s service
-      systemd:
+      ansible.builtin.systemd:
         name: k3s
         state: started
         enabled: true
 
     - name: Wait for node ready
-      shell: kubectl get nodes --no-headers
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - nodes
+          - --no-headers
       register: node_status
+      changed_when: false
       retries: 30
       delay: 5
       until: "'Ready' in node_status.stdout"
 
+    - name: Check whether Helm is installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/helm
+      register: helm_binary
+
     # Install Helm for next steps
+    - name: Download Helm installer
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get-helm-3
+        mode: "0755"
+      when: not helm_binary.stat.exists
+
     - name: Install Helm
-      shell: |
-        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      ansible.builtin.command:
+        argv:
+          - /bin/bash
+          - /tmp/get-helm-3
       args:
         creates: /usr/local/bin/helm
 
     - name: Verify Helm
-      command: helm version
+      ansible.builtin.command:
+        argv:
+          - helm
+          - version
+      changed_when: false
 
     - name: Show node status
-      debug:
+      ansible.builtin.debug:
         var: node_status.stdout_lines

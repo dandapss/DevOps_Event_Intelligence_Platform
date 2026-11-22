@@ -24,9 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_stock_prices_symbol ON stock_prices(symbol);
 
 CREATE INDEX IF NOT EXISTS idx_stock_prices_collected_at ON stock_prices(collected_at);
 
-
----
-
 CREATE TABLE IF NOT EXISTS stock_news (
   id BIGSERIAL PRIMARY KEY,
 

@@ -39,7 +39,7 @@ jobs:
           cp terraform.tf "$BOOTSTRAP_DIR/"
           cp state.tf "$BOOTSTRAP_DIR/"
 
-          if [[ -f terraform/backend/.terraform.lock.hcl ]]; then
+          if [[ -f .terraform.lock.hcl ]]; then
             cp .terraform.lock.hcl "$BOOTSTRAP_DIR"
           fi
 

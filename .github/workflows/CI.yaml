@@ -12,7 +12,7 @@ on:
       - 'kubernetes/**'
       - 'terraform/**'
       - 'ansible/**'
-      - '.github/workflows/CI.yaml'
+      - '.github/workflows/**'
 
   pull_request:
     branches:
@@ -22,7 +22,7 @@ on:
       - 'kubernetes/**'
       - 'terraform/**'
       - 'ansible/**'
-      - '.github/workflows/CI.yaml'
+      - '.github/workflows/**'
 
   workflow_dispatch:
 
@@ -251,12 +251,22 @@ jobs:
       - changes
       - terraform-validate
       - terraform-backend-cd
+      - ansible-validate
+      - kubernetes-validate
 
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.terraform_infra == 'true' &&
       needs.terraform-validate.result == 'success' &&
+      (
+        needs.ansible-validate.result == 'success' ||
+        needs.ansible-validate.result == 'skipped'
+      ) &&
+      (
+        needs.kubernetes-validate.result == 'success' ||
+        needs.kubernetes-validate.result == 'skipped'
+      ) &&
       (
         needs.terraform-backend-cd.result == 'success' ||
         needs.terraform-backend-cd.result == 'skipped'
@@ -284,6 +294,10 @@ jobs:
       needs.changes.outputs.terraform_backend == 'false' &&
       needs.changes.outputs.terraform_infra == 'false' &&
       needs.changes.outputs.ansible == 'true' &&
+      (
+        needs.terraform-validate.result == 'success' ||
+        needs.terraform-validate.result == 'skipped'
+      ) &&
       needs.ansible-validate.result == 'success'
 
     uses: ./.github/workflows/ansible_cd.yaml
