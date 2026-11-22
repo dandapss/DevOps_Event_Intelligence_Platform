@@ -5,8 +5,7 @@ on:
 
 permissions:
   contents: read
-  # Get OIDC Token
-  #id-token: write
+  id-token: write
 
 concurrency:
   group: terraform
@@ -38,3 +37,4 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply --auto-approve
+

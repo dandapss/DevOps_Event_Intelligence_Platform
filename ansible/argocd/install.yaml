@@ -5,11 +5,11 @@
   tasks:
     - name: Add ArgoCD Helm Repo
       shell: |
-        helm repo add argo https://argoproj.github.io/argo-helm
+        helm repo add argo https://argoproj.github.io/argo-helm --force-update
         helm repo update
 
     - name: Copy ArgoCD Helm values to EC2
-      ansible.builtin.shell: |
+      ansible.builtin.copy: 
         src: "{{ playbook_dir }}/argocd/values.yaml"
         dest: /tmp/argocd-values.yaml
         owner: root

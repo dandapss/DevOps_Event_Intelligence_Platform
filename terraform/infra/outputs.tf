@@ -5,5 +5,5 @@ output "instance_public_ip" {
 
 output "instance_id" {
   description = "ec2 instance id for Ansible"
-  value = aws_instance.seob_vm.id
+  value       = aws_instance.seob_vm.id
 }

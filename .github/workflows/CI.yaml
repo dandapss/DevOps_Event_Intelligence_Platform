@@ -1,5 +1,5 @@
 # Created 9th of November 2026.
-# Last update 10th of November 2026.
+# Last update 22th of November 2026.
 
 name: Event Intelligence Platform CI
 
@@ -29,6 +29,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  id-token: write
 
 jobs:
 
