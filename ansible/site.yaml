@@ -1,7 +1,10 @@
 # Running all the ansible in order
 
-- ansible.builtin.import_playbook: k3s/install.yaml
+- name: Install k3s
+  ansible.builtin.import_playbook: k3s/install.yaml
 
-- ansible.builtin.import_playbook: secret/install.yaml
+- name: Create PostgreSQL credentials
+  ansible.builtin.import_playbook: secret/install.yaml
 
-- ansible.builtin.import_playbook: argocd/install.yaml
+- name: Install Argo CD
+  ansible.builtin.import_playbook: argocd/install.yaml

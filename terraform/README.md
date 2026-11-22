@@ -107,4 +107,4 @@ Application image changes follow a separate path: GitHub Actions builds the chan
 - infra/compute.tf — EC2 instance configuration.
 - infra/iam.tf — EC2 role, instance profile, and attached policies.
 - infra/variables.tf — region, CIDRs, Availability Zone, and instance type.
-- infra/outputs.tf — instance ID and public IP for host configuration.
+- infra/outputs.tf — instance ID and public IP for host configuration
