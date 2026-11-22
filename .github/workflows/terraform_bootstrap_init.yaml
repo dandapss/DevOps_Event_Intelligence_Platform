@@ -29,26 +29,46 @@ jobs:
       - name: Terraform format check
         run: terraform fmt -check -recursive .
 
-      # Terraform init without backend connection
-      - name: Initialize with temporary local state
-        run: terraform init -backend=false -input=false
+      # Creating S3 Bucket
+      - name: Prepare local bootstrap directory
+        shell: bash
+        run: |
+          BOOTSTRAP_DIR="${RUNNER_TEMP}/terraform-backend-bootstrap"
+          mkdir -p "$BOOTSTRAP_DIR"
+
+          cp terraform/backend/terraform.tf "$BOOTSTRAP_DIR/"
+          cp terraform/backend/state.tf "$BOOTSTRAP_DIR/"
+
+          if [[ -f terraform/backend/.terraform.lock.hcl ]]; then
+            cp terraform/backend/.terraform.lock.hcl "$BOOTSTRAP_DIR"
+          fi
+
+          echo "BOOTSTRAP_DIR=$BOOTSTRAP_DIR" >> "$GITHUB_ENV"
+
+      - name: Initialize without an S3 backend
+        run: terraform -chdir="$BOOTSTRAP_DIR" init -backend=false -input=false
 
       - name: Terraform validate
-        run: terraform validate
+        run: terraform -chdir="$BOOTSTRAP_DIR" validate
 
       - name: Plan bucket creation
-        run: terraform plan -input=false -out=bootstrap.tfplan
+        run: terraform -chdir="$BOOTSTRAP_DIR" plan -input=false -out="$BOOTSTRAP_DIR/bootstrap.tfplan"
 
       - name: Create the state bucket
-        run: terraform apply -input=false -auto-approve bootstrap.tfplan
+        run: terraform -chdir="$BOOTSTRAP_DIR" apply -input=false -auto-approve "$BOOTSTRAP_DIR/bootstrap.tfplan"
 
       - name: Wait for S3 versioning
         run: sleep 30
 
+      - name: Add the S3 backend configuration
+        run: cp terraform/backend/backend.tf "$BOOTSTRAP_DIR/backend.tf"
+
       - name: Migrate bootstrap state to S3
-        run: terraform init -input=false -migrate-state -force-copy
+        working-directory: terraform/backend
+        run: terraform -chdir="$BOOTSTRAP_DIR" init -input=false -migrate-state -force-copy
 
       - name: Verify remote state and configuration
+        working-directory: terraform/backend
         run: |
-          terraform state list
-          terraform plan -input=false
+          terraform -chdir="$BOOTSTRAP_DIR" state list
+          terraform -chdir="$BOOTSTRAP_DIR" plan -input=false
