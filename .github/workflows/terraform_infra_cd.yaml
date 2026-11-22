@@ -37,15 +37,25 @@ jobs:
           untaint_if_needed() {
             local address="$1"
             local output
+            local status
+            local noralized
 
-            if output=$(terraform untaint "$address" 2>&1); then
-              echo "$output"
-            elif [[ "$output" == *"is not currently tainted"* ]]; then
-              echo "$address is already untainted; skipping."
+            if output=$(terraform untaint -no-color "$address" 2>&1); then
+              printf '%s\n' "$output"
+              return 0
             else
-              echo "$output"
-              return 1
+              status=$?
             fi
+
+            normalized=$(printf '%s' "$output" | tr '\n' ' ' | tr -s ' ')
+
+            if [[ "$normalized" == *"is not currently tainted"* ]]; then
+              echo "$address is already untainted; skipping."
+              return -
+            fi
+
+            printf '%s\n' "$output"
+            return "$status"
           }
 
           untaint_if_needed aws_iam_role.seob_role
