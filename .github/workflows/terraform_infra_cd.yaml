@@ -37,14 +37,11 @@ jobs:
           untaint_if_needed() {
             local address="$1"
             local output
-            local status
             local noralized
 
             if output=$(terraform untaint -no-color "$address" 2>&1); then
               printf '%s\n' "$output"
               return 0
-            else
-              status=$?
             fi
 
             normalized=$(printf '%s' "$output" | tr '\n' ' ' | tr -s ' ')
@@ -55,7 +52,7 @@ jobs:
             fi
 
             printf '%s\n' "$output"
-            return "$status"
+            return 1
           }
 
           untaint_if_needed aws_iam_role.seob_role
