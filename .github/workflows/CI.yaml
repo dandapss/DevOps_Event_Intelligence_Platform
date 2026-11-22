@@ -242,7 +242,10 @@ jobs:
     if: |
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.terraform_backend == 'true' &&
-      needs.terraform-validate.result == 'success'
+      (
+        needs.terraform-validate.result == 'success' ||
+        needs.terraform-validate.result == 'skipped'
+      )
 
     uses: ./.github/workflows/terraform_backend_cd.yaml
 
@@ -258,7 +261,10 @@ jobs:
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.terraform_infra == 'true' &&
-      needs.terraform-validate.result == 'success' &&
+      (
+        needs.terraform-validate.result == 'success' ||
+        needs.terraform-validate.result == 'skipped'
+      ) &&
       (
         needs.ansible-validate.result == 'success' ||
         needs.ansible-validate.result == 'skipped'
