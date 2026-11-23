@@ -1,3 +1,4 @@
+??? from here until ???END lines may have been inserted/deleted
 ### Compute ###
 
 #-----#
@@ -10,7 +11,7 @@ data "aws_ami" "ubuntu" {
   filter {
     name = "name"
     values = [
-      "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+      "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-22.04-amd64-server-*"
     ]
   }
 }
@@ -55,3 +56,4 @@ resource "aws_instance" "seob_vm" {
 #}
 # Create separate bucket for cloudtrail
 # Add Cloudtrail as an update later
+???END
