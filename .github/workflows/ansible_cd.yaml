@@ -63,6 +63,9 @@ jobs:
           ansible_shell_type=sh
           EOF
 
+      - name: Let's Check if you are being created
+        run: cat inventory.ini
+
       - name: Verify SSM connectivity
         run: |
           ansible -i inventory.ini k3s -m ping -vvvv
