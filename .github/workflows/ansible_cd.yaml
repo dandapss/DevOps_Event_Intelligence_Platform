@@ -61,6 +61,16 @@ jobs:
           ansible_aws_ssm_region=eu-central-1
           ansible_aws_ssm_bucket_name=eip-ansible-ssm-transfer-236608206962-eu-central-1
           EOF
+      
+      - name: Verify SSM connectivity
+        run: |
+          echo "INSTANCE_ID"=$INSTANCE_ID
+
+          aws ssm describe-instance-information \
+            --region eu-central-1 \
+            --query "InstanceInformationList[?InstanceId=='${Instance_ID}']" \
+            --output table
+          ansible -i inventory.ini k3s -m ping -vvv
 
       - name: Run Ansible
         run: |
