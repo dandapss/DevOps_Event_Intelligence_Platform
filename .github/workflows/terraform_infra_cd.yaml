@@ -40,7 +40,8 @@ jobs:
             aws_vpc.seob_vpc \
             aws_iam_role_policy.postgresql_parameter_read \
             aws_security_group.seob_sg \
-            aws_subnet.seob_subnet
+            aws_subnet.seob_subnet \
+            aws_instance.seob_vm
           do
             if output=$(terraform untaint -no-color "$address" 2>&1); then
               printf '%s\n' "$output"
