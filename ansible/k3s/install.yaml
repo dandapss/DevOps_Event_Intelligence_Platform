@@ -11,9 +11,37 @@
       ansible.builtin.apt:
         name:
           - curl
-          - awscli
+          - unzip
           - python3-kubernetes
         state: present
+
+    - name: Install unzip
+      ansible.builtin.apt:
+        name: unzip
+        state: present
+        update_cache: true
+
+    - name: Download AWS CLI v2
+      ansible.builtin.unarchive:
+        src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: /tmp
+        remote_src: true
+        creates: /tmp/aws
+
+    - name: Install AWS CLI v2
+      ansible.builtin.command:
+        cmd: /tmp/aws/install
+        creates: /usr/local/bin/aws
+
+    - name: Verify AWS CLI installation
+      ansible.builtin.command:
+        cmd: aws --version
+      register: aws_version
+      changed_when: false
+
+    - name: Show AWS CLI version
+      ansible.builtin.debug:
+        var: aws_version.stdout
 
     - name: Check whether k3s is installed
       ansible.builtin.stat:
