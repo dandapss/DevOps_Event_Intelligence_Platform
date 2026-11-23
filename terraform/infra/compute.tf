@@ -55,4 +55,3 @@ resource "aws_instance" "seob_vm" {
 #}
 # Create separate bucket for cloudtrail
 # Add Cloudtrail as an update later
-???END
