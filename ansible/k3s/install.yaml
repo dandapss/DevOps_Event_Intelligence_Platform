@@ -87,7 +87,7 @@
         path: /usr/local/bin/helm
       register: helm_binary
 
-    # Install Helm for next steps
+   # Install Helm for next steps
     - name: Download Helm installer
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3

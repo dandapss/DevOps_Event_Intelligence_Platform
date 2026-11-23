@@ -63,21 +63,8 @@ jobs:
           ansible_shell_type=sh
           EOF
 
-      - name: Test raw SSM session
-        run: |
-          aws ssm start-session \
-            --instance-ids $INSTANCE_ID \
-            --document-name AWS-RunShellScript \
-            --parameters commands="whoami"
-      
       - name: Verify SSM connectivity
         run: |
-          echo "INSTANCE_ID"=$INSTANCE_ID
-
-          aws ssm describe-instance-information \
-            --region eu-central-1 \
-            --query "InstanceInformationList[?InstanceId=='${Instance_ID}']" \
-            --output table
           ansible -i inventory.ini k3s -m ping -vvvv
 
       - name: Run Ansible
