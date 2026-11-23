@@ -69,6 +69,12 @@
         state: started
         enabled: true
 
+    - name: Test connection after k3s install
+      ansible.builtin.command:
+        argv:
+          - whoami
+      changed_when: false
+
     - name: Wait for node ready
       ansible.builtin.command:
         argv:
