@@ -10,40 +10,59 @@
 
     - name: Copy ArgoCD Helm values to EC2
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/values.yaml"
+        src: "{{ playbook_dir }}/argocd/values.yaml"
         dest: /tmp/argocd-values.yaml
         owner: root
         group: root
         mode: "0600"
 
-    - name: Get pending Helm history
+    - name: Inspect pending Helm releases
       ansible.builtin.command:
         argv:
           - helm
           - list
-          - -A
+          - --all-namespaces
           - --pending
-          - -o
+          - --output
           - json
       environment:
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
       register: pending_helm
       changed_when: false
 
-    - name: If Exist, uninstall stuck pending Helm release
+    - name: Uninstall pending Helm releases
       ansible.builtin.command:
         argv:
           - helm
           - uninstall
           - "{{ item.name }}"
-          - -n
+          - --namespace
           - "{{ item.namespace }}"
-      loop: "{{ pending_helm.stdout | from_json }}"
-      loop_control:
-        label: "{{ item.name }} ({{ item.namespace }})"
+          - --wait
+          - --timeout
+          - 1m
       environment:
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      changed_when: true
+      loop: "{{ pending_helm.stdout | from_json }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.namespace }})" 
+
+    - name: Verify pending Helm releases are cleared
+      ansible.builtin.command:
+        argv:
+          - helm
+          - list
+          - --all-namespaces
+          - --pending
+          - --output
+          - json
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: pending_helm_after
+      changed_when: false
+      retries: 5
+      delay: 5
+      until: (pending_helm_after.stdout | from_json | length) == 0
 
     - name: Install or upgrade ArgoCD
       kubernetes.core.helm:
@@ -68,6 +87,8 @@
           - argocd
           - -o
           - jsonpath={.status.readyReplicas}
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
       register: argocd_status
       changed_when: false
       retries: 30
