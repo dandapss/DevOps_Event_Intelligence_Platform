@@ -3,9 +3,15 @@
   become: true
 
   tasks:
-    - name: Update apt cache
-      ansible.builtin.apt:
-        update_cache: true
+    - name: Create 2GB swap file if not exists
+      ansible.builtin.shell: |
+        fallocate -| 2G /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      args:
+        creates: /swapfile
 
     - name: Install required packages
       ansible.builtin.apt:
@@ -13,11 +19,6 @@
           - curl
           - unzip
           - python3-kubernetes
-        state: present
-
-    - name: Install unzip
-      ansible.builtin.apt:
-        name: unzip
         state: present
         update_cache: true
 
@@ -39,27 +40,20 @@
       register: aws_version
       changed_when: false
 
-    - name: Show AWS CLI version
-      ansible.builtin.debug:
-        var: aws_version.stdout
-
-    - name: Check whether k3s is installed
-      ansible.builtin.stat:
-        path: /etc/rancher/k3s/k3s.yaml
-      register: k3s_config
-
     - name: Download k3s installer
       ansible.builtin.get_url:
         url: https://get.k3s.io
         dest: /tmp/install-k3s.sh
         mode: "0755"
-      when: not k3s_config.stat.exists
+        force: false
 
     - name: Install k3s
       ansible.builtin.command:
         argv:
           - /bin/sh
           - /tmp/install-k3s.sh
+      environment:
+        INSTALL_K3S_EXEC: "server --disable=traefik --disable=servicelb"
       args:
         creates: /etc/rancher/k3s/k3s.yaml
 
@@ -86,18 +80,13 @@
       ansible.builtin.pause:
         seconds: 15
 
-    - name: Check whether Helm is installed
-      ansible.builtin.stat:
-        path: /usr/local/bin/helm
-      register: helm_binary
-
    # Install Helm for next steps
     - name: Download Helm installer
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
         dest: /tmp/get-helm-3
         mode: "0755"
-      when: not helm_binary.stat.exists
+        force: false
 
     - name: Install Helm
       ansible.builtin.command:
@@ -108,12 +97,14 @@
         creates: /usr/local/bin/helm
 
     - name: Verify Helm
-      ansible.builtin.command:
-        argv:
-          - helm
-          - version
+      ansible.builtin.command: "{{ item }}"
+        loop:
+          - aws --version
+          - kubectl get nodes
+          - helm version
+        register: verify_out
       changed_when: false
 
     - name: Show node status
       ansible.builtin.debug:
-        var: node_status.stdout_lines
+        msg: "{{ verify_out.results | map(attribute='stdout_lines') | list }}"
