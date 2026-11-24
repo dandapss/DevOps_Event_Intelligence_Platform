@@ -55,13 +55,14 @@
           - list
           - --all-namespaces
           - --pending
+          - --uninstalling
           - --output
           - json
       environment:
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
       register: pending_helm_after
       changed_when: false
-      retries: 5
+      retries: 12
       delay: 5
       until: (pending_helm_after.stdout | from_json | length) == 0
 
