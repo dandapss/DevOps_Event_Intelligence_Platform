@@ -45,7 +45,7 @@
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
       loop: "{{ pending_helm.stdout | from_json }}"
       loop_control:
-        label: "{{ item.name }} ({{ item.namespace }})" 
+        label: "{{ item.name }} ({{ item.namespace }})"
 
     - name: Verify pending Helm releases are cleared
       ansible.builtin.command:
