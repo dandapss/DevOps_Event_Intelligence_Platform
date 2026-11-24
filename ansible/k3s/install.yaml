@@ -4,13 +4,15 @@
 
   tasks:
     - name: Create 2GB swap file if not exists
-      ansible.builtin.shell: |
-        fallocate -| 2G /swapfile
-        chmod 600 /swapfile
-        mkswap /swapfile
-        swapon /swapfile
-        echo '/swapfile none swap sw 0 0' >> /etc/fstab
-      args:
+      ansible.builtin.shell:
+        cmd: |
+          set -euo pipefail
+          fallocate -| 2G /swapfile
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        executable: /bin/bash
         creates: /swapfile
 
     - name: Install required packages
