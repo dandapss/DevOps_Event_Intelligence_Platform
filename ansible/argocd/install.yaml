@@ -26,11 +26,11 @@
           - argocd
           - -o
           - json
-        environment:
-          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-        register: helm_release_status
-        failed_when: false
-        changed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: helm_release_status
+      failed_when: false
+      changed_when: false
 
     - name: Clean up stuck pending Helm release
       ansible.builtin.command:
@@ -42,11 +42,13 @@
           - argocd
           - -l
           - "owner=helm,name=argocd,status in (pending-install,pending-upgrade,pending-rollback)"
-        environment:
-          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-        when:
-          - helm_release_status.rc == 0
-          - "'pending-' in helm_release_status.stdout"
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: clean_helm_lock
+      changed_when: "'deleted' in clean_helm_lock.stdout"
+      when:
+        - helm_release_status.rc == 0
+        - "'pending-' in helm_release_status.stdout"
 
     - name: Install or upgrade ArgoCD
       kubernetes.core.helm:
