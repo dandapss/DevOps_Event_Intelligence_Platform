@@ -34,6 +34,11 @@ jobs:
       - name: Clear taint markers when present
         shell: bash
         run: |
+          if ! terraform state list >/dev/null 2>&1; then
+            echo "No Terraform state found. Skipping untaint."
+            exit 0
+          fi
+
           for address in \
             aws_iam_role.seob_role \
             aws_s3_bucket.ansible_ssm_transfer \
