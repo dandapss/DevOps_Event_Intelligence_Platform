@@ -9,4 +9,3 @@ terraform {
     use_lockfile = true
   }
 }
-
