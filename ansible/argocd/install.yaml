@@ -40,7 +40,7 @@
           - "{{ item.namespace }}"
           - --wait
           - --timeout
-          - 1m
+          - 5m
       environment:
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
       loop: "{{ pending_helm.stdout | from_json }}"
