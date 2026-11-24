@@ -10,7 +10,7 @@
 
     - name: Copy ArgoCD Helm values to EC2
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/argocd/values.yaml"
+        src: "{{ playbook_dir }}/values.yaml"
         dest: /tmp/argocd-values.yaml
         owner: root
         group: root
