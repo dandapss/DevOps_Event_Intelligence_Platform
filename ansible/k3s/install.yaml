@@ -98,11 +98,11 @@
 
     - name: Verify Helm
       ansible.builtin.command: "{{ item }}"
-        loop:
-          - aws --version
-          - kubectl get nodes
-          - helm version
-        register: verify_out
+      loop:
+        - aws --version
+        - kubectl get nodes
+        - helm version
+      register: verify_out
       changed_when: false
 
     - name: Show node status
