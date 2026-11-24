@@ -35,9 +35,9 @@
         argv:
           - helm
           - uninstall
-          - {{ item.name }}
+          - "{{ item.name }}"
           - -n
-          - {{ item.namespace }}
+          - "{ item.namespace }}"
       loop: "{{ pending_helm.stdout | from_json }}"
       loop_control:
         label: "{{ item.name }} ({{ item.namespace }})"
