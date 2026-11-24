@@ -46,6 +46,7 @@
       loop: "{{ pending_helm.stdout | from_json }}"
       loop_control:
         label: "{{ item.name }} ({{ item.namespace }})"
+      changed_when: false
 
     - name: Verify pending Helm releases are cleared
       ansible.builtin.command:
