@@ -82,6 +82,10 @@
       delay: 5
       until: "'Ready' in node_status.stdout"
 
+    - name: Wait to stabilize
+      ansible.builtin.pause:
+        seconds: 15
+
     - name: Check whether Helm is installed
       ansible.builtin.stat:
         path: /usr/local/bin/helm
