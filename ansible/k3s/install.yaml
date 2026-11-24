@@ -7,7 +7,7 @@
       ansible.builtin.shell:
         cmd: |
           set -euo pipefail
-          fallocate -| 2G /swapfile
+          fallocate --length 2G /swapfile
           chmod 600 /swapfile
           mkswap /swapfile
           swapon /swapfile
