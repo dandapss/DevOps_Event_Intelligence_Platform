@@ -16,36 +16,34 @@
         group: root
         mode: "0600"
 
-    - name: Get ArgoCD Helm history
+    - name: Get pending Helm history
       ansible.builtin.command:
         argv:
           - helm
-          - history
-          - argocd
-          - -n
-          - argocd
-          - --max
-          - "1"
+          - list
+          - -A
+          - --pending
+          - -o
+          - json
       environment:
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: helm_history
-      failed_when: false
+      register: pending_helm
       changed_when: false
 
-    - name: If Exist, uninstall stuck pending ArgoCD release
+    - name: If Exist, uninstall stuck pending Helm release
       ansible.builtin.command:
         argv:
           - helm
           - uninstall
-          - argocd
+          - {{ item.name }}
           - -n
-          - argocd
+          - {{ item.namespace }}
+      loop: "{{ pending_helm.stdout | from_json }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.namespace }})"
       environment:
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
       changed_when: true
-      when:
-        - helm_history.rc == 0
-        - "'pending' in helm_history.stdout"
 
     - name: Install or upgrade ArgoCD
       kubernetes.core.helm:
