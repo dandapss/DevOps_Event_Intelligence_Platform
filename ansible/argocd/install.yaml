@@ -10,7 +10,7 @@
 
     - name: Copy ArgoCD Helm values to EC2
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/argocd/values.yaml"
+        src: "{{ playbook_dir }}/values.yaml"
         dest: /tmp/argocd-values.yaml
         owner: root
         group: root
@@ -46,7 +46,7 @@
       loop: "{{ pending_helm.stdout | from_json }}"
       loop_control:
         label: "{{ item.name }} ({{ item.namespace }})"
-      changed_when: false
+      changed_when: true
 
     - name: Verify pending Helm releases are cleared
       ansible.builtin.command:
