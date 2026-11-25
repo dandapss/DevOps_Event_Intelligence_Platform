@@ -16,6 +16,14 @@ spec:
         spec:
           restartPolicy: Never
 
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+
           containers:
             - name: news-collector
               image: news-collector
@@ -34,3 +42,12 @@ spec:
                     secretKeyRef:
                       name: eip-postgresql-auth
                       key: password
+
+              securityContext:
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                runAsUser: 1000
+                capabilities:
+                  drop:
+                    - ALL

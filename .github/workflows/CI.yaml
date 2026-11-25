@@ -1,5 +1,5 @@
 # Created 9th of November 2026.
-# Last update 22th of November 2026.
+# Last update 25th of November 2026.
 
 name: Event Intelligence Platform CI
 
@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - main
+      - dev
     paths:
       - 'src/**'
       - 'kubernetes/**'
@@ -230,6 +231,43 @@ jobs:
 #--------------#
 
 
+#---------------------#
+# Security Scan Start #
+#---------------------#
+
+  security-scan:
+    needs:
+      - changes
+      - terraform-validate
+      - ansible-validate
+      - kubernetes-validate
+      - image-validate
+
+#      github.ref == 'refs/heads/main' &&
+    if: |
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy IaC & Config Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+#-------------------#
+# Security Scan End #
+#-------------------#
+
+
  # if called ---------#
  # Terraform CD Start #
  #--------------------#
@@ -238,9 +276,11 @@ jobs:
     needs:
       - changes
       - terraform-validate
+      - security-scan
 
     if: |
       github.ref == 'refs/heads/main' &&
+      needs.security-scan.result == 'success' &&
       needs.changes.outputs.terraform_backend == 'true' &&
       (
         needs.terraform-validate.result == 'success' ||
@@ -256,10 +296,12 @@ jobs:
       - terraform-backend-cd
       - ansible-validate
       - kubernetes-validate
+      - security-scan
 
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
+      needs.security-scan.result == 'success' &&
       needs.changes.outputs.terraform_infra == 'true' &&
       (
         needs.terraform-validate.result == 'success' ||
@@ -294,9 +336,12 @@ jobs:
       - changes
       - terraform-validate
       - ansible-validate
+      - security-scan
+
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
+      needs.security-scan.result == 'success' &&
       needs.changes.outputs.terraform_backend == 'false' &&
       needs.changes.outputs.terraform_infra == 'false' &&
       needs.changes.outputs.ansible == 'true' &&
@@ -321,11 +366,18 @@ jobs:
     needs:
       - changes
       - image-validate
+      - security-scan
 
-    if: needs.changes.outputs.images != '[]' && needs.image-validate.result == 'success'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.security-scan.result == 'success' &&
+      needs.changes.outputs.images != '[]' &&
+      needs.image-validate.result == 'success'
+
     permissions:
       packages: write
       contents: read
+
     runs-on: ubuntu-latest
 
     strategy:
@@ -372,9 +424,14 @@ jobs:
     needs:
       - changes
       - image-build
-    if: github.ref == 'refs/heads/main' && needs.image-build.result == 'success'
+
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.image-build.result == 'success'
+
     permissions:
       contents: write
+
     runs-on: ubuntu-latest
 
     steps:

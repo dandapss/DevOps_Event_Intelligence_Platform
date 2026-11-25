@@ -77,4 +77,3 @@ jobs:
       needs.terraform-apply.result == 'success'
 
     uses: ./.github/workflows/ansible_cd.yaml
-
