@@ -1,5 +1,6 @@
 ### S3 ###
 
+
 resource "aws_s3_bucket" "seob_s3" {
   bucket = "seob-bucket"
 
