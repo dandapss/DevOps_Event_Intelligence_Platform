@@ -6,23 +6,10 @@ name: Event Intelligence Platform CI
 on:
   push:
     branches:
-      - main
       - dev
     paths:
       - 'src/**'
       - 'kubernetes/**'
-      - 'terraform/**'
-      - 'ansible/**'
-      - '.github/workflows/**'
-
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'kubernetes/**'
-      - 'terraform/**'
-      - 'ansible/**'
       - '.github/workflows/**'
 
   workflow_dispatch:
@@ -30,7 +17,6 @@ on:
 permissions:
   contents: read
   pull-requests: read
-  id-token: write
 
 jobs:
 
@@ -42,9 +28,6 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      terraform_backend: ${{ steps.filter.outputs.terraform_backend }}
-      terraform_infra: ${{ steps.filter.outputs.terraform_infra }}
-      ansible: ${{ steps.filter.outputs.ansible }}
       kubernetes: ${{ steps.filter.outputs.kubernetes }}
       images: ${{ steps.targets.outputs.images }}
 
@@ -59,14 +42,6 @@ jobs:
         with:
           list-files: json
           filters: |
-            terraform_backend:
-              - 'terraform/backend/**'
-
-            terraform_infra:
-              - 'terraform/infra/**'
-
-            ansible:
-              - 'ansible/**'
 
             kubernetes:
               - 'kubernetes/**'
@@ -92,9 +67,6 @@ jobs:
           fetch-depth: 0
 
       - run: |
-          echo "terraform_backend=${{ needs.changes.outputs.terraform_backend }}"
-          echo "terraform_infra=${{ needs.changes.outputs.terraform_infra }}"
-          echo "ansible=${{ needs.changes.outputs.ansible }}"
           echo "kubernetes=${{ needs.changes.outputs.kubernetes }}"
           echo "images=${{ needs.changes.outputs.images }}"
 
@@ -113,49 +85,6 @@ jobs:
 #----------------#
 # Validate Start #
 #----------------#
-
-  terraform-validate:
-    needs: changes
-    if: |
-      needs.changes.outputs.terraform_backend == 'true' ||
-      needs.changes.outputs.terraform_infra == 'true'
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-
-      - run: terraform fmt -check -recursive terraform
-        name: Terraform format check
-
-      - name: validate backend
-        if: needs.changes.outputs.terraform_backend == 'true'
-        run: |
-          terraform -chdir=terraform/backend init -backend=false -input=false
-          terraform -chdir=terraform/backend validate
-
-      - name: validate infra
-        if: needs.changes.outputs.terraform_infra == 'true'
-        run: |
-          terraform -chdir=terraform/infra init -backend=false -input=false
-          terraform -chdir=terraform/infra validate
-
-  ansible-validate:
-    needs: changes
-    if: needs.changes.outputs.ansible == 'true'
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Ansible
-        run: pip install ansible ansible-lint
-
-      - name: Ansible Lint
-        run: ansible-lint ansible/site.yaml
 
   kubernetes-validate:
     needs: changes
@@ -238,14 +167,13 @@ jobs:
   security-scan:
     needs:
       - changes
-      - terraform-validate
       - ansible-validate
       - kubernetes-validate
       - image-validate
 
-#      github.ref == 'refs/heads/main' &&
     if: |
       always() &&
+      github.ref == 'refs/heads/dev' &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled')
 
@@ -267,155 +195,7 @@ jobs:
 # Security Scan End #
 #-------------------#
 
-
- # if called ---------#
- # Terraform CD Start #
- #--------------------#
-
-  terraform-backend-cd:
-    needs:
-      - changes
-      - terraform-validate
-      - security-scan
-
-    if: |
-      github.ref == 'refs/heads/main' &&
-      needs.security-scan.result == 'success' &&
-      needs.changes.outputs.terraform_backend == 'true' &&
-      (
-        needs.terraform-validate.result == 'success' ||
-        needs.terraform-validate.result == 'skipped'
-      )
-
-    uses: ./.github/workflows/terraform_backend_cd.yaml
-
-  terraform-infra-cd:
-    needs:
-      - changes
-      - terraform-validate
-      - terraform-backend-cd
-      - ansible-validate
-      - kubernetes-validate
-      - security-scan
-
-    if: |
-      always() &&
-      github.ref == 'refs/heads/main' &&
-      needs.security-scan.result == 'success' &&
-      needs.changes.outputs.terraform_infra == 'true' &&
-      (
-        needs.terraform-validate.result == 'success' ||
-        needs.terraform-validate.result == 'skipped'
-      ) &&
-      (
-        needs.ansible-validate.result == 'success' ||
-        needs.ansible-validate.result == 'skipped'
-      ) &&
-      (
-        needs.kubernetes-validate.result == 'success' ||
-        needs.kubernetes-validate.result == 'skipped'
-      ) &&
-      (
-        needs.terraform-backend-cd.result == 'success' ||
-        needs.terraform-backend-cd.result == 'skipped'
-      )
-
-    uses: ./.github/workflows/terraform_infra_cd.yaml
-
- #------------------#
- # Terraform CD End #
- #------------------#
-
-
- # if called -------#
- # Ansible CD Start #
- #------------------#
-
-  ansible-cd:
-    needs:
-      - changes
-      - terraform-validate
-      - ansible-validate
-      - security-scan
-
-    if: |
-      always() &&
-      github.ref == 'refs/heads/main' &&
-      needs.security-scan.result == 'success' &&
-      needs.changes.outputs.terraform_backend == 'false' &&
-      needs.changes.outputs.terraform_infra == 'false' &&
-      needs.changes.outputs.ansible == 'true' &&
-      (
-        needs.terraform-validate.result == 'success' ||
-        needs.terraform-validate.result == 'skipped'
-      ) &&
-      needs.ansible-validate.result == 'success'
-
-    uses: ./.github/workflows/ansible_cd.yaml
-
- #----------------#
- # Ansible CD End #
- #----------------#
-
-
- # if called ---------#
- # Docker Build Start #
- #--------------------#
-
-  image-build:
-    needs:
-      - changes
-      - image-validate
-      - security-scan
-
-    if: |
-      github.ref == 'refs/heads/main' &&
-      needs.security-scan.result == 'success' &&
-      needs.changes.outputs.images != '[]' &&
-      needs.image-validate.result == 'success'
-
-    permissions:
-      packages: write
-      contents: read
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        image: ${{ fromJSON(needs.changes.outputs.images) }}
-
-    env:
-      IMAGE_NAME: ${{ matrix.image }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build image
-        run: |
-          docker build \
-          -t "ghcr.io/dandapss/eip/${IMAGE_NAME}:${GITHUB_SHA}" \
-          -t "ghcr.io/dandapss/eip/${IMAGE_NAME}:latest" "src/${IMAGE_NAME}"
-
-      - name: Login GHCR
-        if: github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push Images
-        if: github.ref == 'refs/heads/main'
-        run: |
-          docker push ghcr.io/dandapss/eip/${IMAGE_NAME}:${GITHUB_SHA}
-          docker push ghcr.io/dandapss/eip/${IMAGE_NAME}:latest
-
- #------------------#
- # Docker Build End #
- #------------------#
-
-
+ 
  # if called ---------#
  # Updating Tag Start #
  #--------------------#
@@ -423,11 +203,12 @@ jobs:
   update-image-tag:
     needs:
       - changes
-      - image-build
+      - security-scan
 
     if: |
-      github.ref == 'refs/heads/main' &&
-      needs.image-build.result == 'success'
+      github.ref == 'refs/heads/dev' &&
+      needs.security-scan.result == 'success' &&
+      needs.changes.outputs.images != '[]'
 
     permissions:
       contents: write
