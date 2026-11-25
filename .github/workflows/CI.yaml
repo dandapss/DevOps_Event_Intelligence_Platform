@@ -167,7 +167,6 @@ jobs:
   security-scan:
     needs:
       - changes
-      - ansible-validate
       - kubernetes-validate
       - image-validate
 
