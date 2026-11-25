@@ -8,4 +8,3 @@ resources:
   - apps/stock-collector/application.yaml
   - apps/news-collector/application.yaml
   - postgresql/application.yaml
-  - ebs-csi/application.yaml
