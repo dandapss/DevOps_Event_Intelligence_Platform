@@ -34,3 +34,12 @@ spec:
                     secretKeyRef:
                       name: eip-postgresql-auth
                       key: password
+
+              securityContext:
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                runAsUser: 1000
+                capabilities:
+                  drop:
+                    - ALL

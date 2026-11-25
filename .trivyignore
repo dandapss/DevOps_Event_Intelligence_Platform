@@ -1,0 +1,8 @@
+# Allow to not use AWS KMS in S3
+AWS-0132
+
+# Allow all the egress from EC2
+AWS-0104
+
+# Allow to use public subnet (Budget issue)
+AWS-0164
