@@ -243,9 +243,9 @@ jobs:
       - kubernetes-validate
       - image-validate
 
+#      github.ref == 'refs/heads/main' &&
     if: |
       always() &&
-#      github.ref == 'refs/heads/main' &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled')
 
