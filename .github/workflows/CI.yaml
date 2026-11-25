@@ -371,7 +371,7 @@ jobs:
     if: |
       github.ref == 'refs/heads/main' &&
       needs.security-scan.result == 'success' &&
-      needs.changes.outputs.images != '[]' && 
+      needs.changes.outputs.images != '[]' &&
       needs.image-validate.result == 'success'
 
     permissions:
@@ -426,7 +426,7 @@ jobs:
       - image-build
 
     if: |
-      github.ref == 'refs/heads/main' && 
+      github.ref == 'refs/heads/main' &&
       needs.image-build.result == 'success'
 
     permissions:
