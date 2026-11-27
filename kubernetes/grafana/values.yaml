@@ -11,10 +11,15 @@ service:
 ingress:
   enabled: false
 
-additionalDataSources:
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus-operated.monitoring.svc.cluster.local:9090
+    isDefault: true
+
   - name: PostgreSQL
     type: postgres
-    access: proxy
     url: postgresql.collector.svc.cluster.local:5432
     database: event_intelligence
     user: db_user
