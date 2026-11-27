@@ -31,6 +31,9 @@ def get_stock_data(symbol: str):
 
   info = ticker.info
 
+  print(f"{symbol} info: ")
+  print(info)
+
   current_price = info.get("currentPrice")
   previous_close = info.get("previousClose")
   observed_epoch = info.get("regularMarketTime")
