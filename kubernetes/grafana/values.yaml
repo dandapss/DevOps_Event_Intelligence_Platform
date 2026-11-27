@@ -10,3 +10,27 @@ service:
 
 ingress:
   enabled: false
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-operated.monitoring.svc.cluster.local:9090
+        isDefault: false
+
+      - name: PostgreSQL
+        type: postgres
+        url: postgresql.collector.svc.cluster.local:5432
+        user: db_user
+        database: event_intelligence
+        secureJsonData:
+          password: db_password
+        jsonData:
+          sslmode: disable
+          postgresVersion: 1500
+          timescaledb: false
+        isDefault: true
