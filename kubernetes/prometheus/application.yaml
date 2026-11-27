@@ -13,8 +13,8 @@ spec:
 #    path: kubernetes/prometheus
 
 # Only for dev
-  source:
-    - repoURL: https://github.com
+  sources:
+    - repoURL: https://github.com/prometheus-community/helm-charts.git
       targetRevision: kube-prometheus-stack-75.8.0
       path: charts/kube-prometheus-stack
       helm:
@@ -34,5 +34,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace = true
-      - ServerSideApply = true
+      - CreateNamespace=true
+      - ServerSideApply=true
