@@ -8,4 +8,4 @@ resources:
 images:
   - name: stock-collector
     newName: ghcr.io/dandapss/eip/stock-collector
-    newTag: e53b5cd01abf7643dd68ea6f770f115c2cd39c2c
+    newTag: e4426ca58e9f54ef08dac4cbd25ef0fcea62cd5d
