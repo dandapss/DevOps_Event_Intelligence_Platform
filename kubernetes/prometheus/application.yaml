@@ -8,7 +8,7 @@ spec:
 
   source:
     repoURL: https://github.com/dandapss/DevOps_Event_Intelligence_Platform.git
-    targetRevision: main
+    targetRevision: dev
     path: kubernetes/prometheus
 
   destination:
