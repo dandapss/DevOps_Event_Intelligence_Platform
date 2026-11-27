@@ -6,7 +6,7 @@ metadata:
   labels:
     grafana_dashboard: "1"
   data:
-    eip-postgres-overview.json: |-
+    eip-postgres-overview.json: |
 {
   "annotations": {
     "list": [
