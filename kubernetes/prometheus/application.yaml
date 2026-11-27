@@ -6,24 +6,10 @@ metadata:
 spec:
   project: default
 
-# for main
-#  source:
-#    repoURL: https://github.com/dandapss/DevOps_Event_Intelligence_Platform.git
-#    targetRevision: dev
-#    path: kubernetes/prometheus
-
-# Only for dev
-  sources:
-    - repoURL: https://github.com/prometheus-community/helm-charts.git
-      targetRevision: kube-prometheus-stack-75.8.0
-      path: charts/kube-prometheus-stack
-      helm:
-        valueFiles:
-          - $values/kubernetes/prometheus/values.yaml
-    - repoURL: https://github.com/dandapss/DevOps_Event_Intelligence_Platform.git
-      targetRevision: dev
-      ref: values
-
+  source:
+    repoURL: https://github.com/dandapss/DevOps_Event_Intelligence_Platform.git
+    targetRevision: dev
+    path: kubernetes/prometheus
 
   destination:
     server: https://kubernetes.default.svc
