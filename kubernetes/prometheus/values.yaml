@@ -1,6 +1,7 @@
-grafana:
-  enabled: false
+kube-prometheus-stack:
+  grafana:
+    enabled: false
 
-prometheus:
-  prometheusSpec:
-    serviceMonitorSelectorNilUsesHelmValues: false
+  prometheus:
+    prometheusSpec:
+      serviceMonitorSelectorNilUsesHelmValues: false

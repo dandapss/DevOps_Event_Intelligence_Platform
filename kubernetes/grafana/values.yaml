@@ -1,33 +1,35 @@
-adminUser: admin
+grafana:
+  adminUser: admin
 
-persistence:
-  enabled: true
+  persistence:
+    enabled: true
+    size: 2Gi
 
-  size: 2Gi
+  service:
+    type: ClusterIP
 
-service:
-  type: ClusterIP
+  ingress:
+    enabled: false
 
-ingress:
-  enabled: false
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus-operated.monitoring.svc.cluster.local:9090
+          isDefault: true
+  
+        - name: PostgreSQL
+        type: postgres
+        url: postgresql.collector.svc.cluster.local:5432
+        database: event_intelligence
+        user: db_user
 
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://prometheus-operated.monitoring.svc.cluster.local:9090
-    isDefault: true
+        secureJsonData:
+          password: db_password
 
-  - name: PostgreSQL
-    type: postgres
-    url: postgresql.collector.svc.cluster.local:5432
-    database: event_intelligence
-    user: db_user
-
-    secureJsonData:
-      password: db_password
-
-    jsonData:
-      sslmode: disable
-      postgresVersion: 1500
-      timescaledb: false
+        jsonData:
+          sslmode: disable
+          postgresVersion: 1500
+          timescaledb: false
