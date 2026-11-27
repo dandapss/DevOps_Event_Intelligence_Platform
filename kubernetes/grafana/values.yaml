@@ -11,6 +11,12 @@ grafana:
   ingress:
     enabled: false
 
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+
   datasources:
     datasources.yaml:
       apiVersion: 1
